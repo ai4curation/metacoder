@@ -1,6 +1,6 @@
 site_name: Metacoder
 site_description: A unified interface for AI coding assistants
-site_url: https://github.com/cmungall/metacoder
+site_url: https://ai4curation.github.io/metacoder
 
 theme:
   name: material
@@ -64,5 +64,5 @@ plugins:
             merge_init_into_class: true
             show_signature_annotations: true
 
-repo_url: https://github.com/contextual-ai/metacoder
-repo_name: contextual-ai/metacoder
+repo_url: https://github.com/ai4curation/metacoder
+repo_name: ai4curation/metacoder
