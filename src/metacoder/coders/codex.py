@@ -3,8 +3,9 @@ from pathlib import Path
 import subprocess
 import time
 import logging
+import shutil
 
-from coders.base_coder import BaseCoder, CoderConfigObject, CoderOutput, FileType, change_directory
+from metacoder.coders.base_coder import BaseCoder, CoderConfigObject, CoderOutput, FileType, change_directory
 
 
 
@@ -15,10 +16,19 @@ class CodexCoder(BaseCoder):
     For AWS bedrock, you may need to copy ~/.aws/
 
     """
+    
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if codex command is available."""
+        return shutil.which('codex') is not None
+    
+    def instruction_files(self) -> dict[str, str]:
+        """Return instruction files as a dictionary of filename to content."""
+        return {}
 
     @property
     def instructions_path(self) -> Path:
-        return "AGENTS.md"
+        return Path("AGENTS.md")
 
     def default_config_objects(self) -> list[CoderConfigObject]:
         """

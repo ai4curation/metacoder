@@ -1,0 +1,68 @@
+site_name: Metacoder
+site_description: A unified interface for AI coding assistants
+site_url: https://github.com/cmungall/metacoder
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Coders:
+    - Overview: coders/index.md
+    - Goose: coders/goose.md
+    - Claude Code: coders/claude-code.md
+    - Codex: coders/codex.md
+    - Gemini: coders/gemini.md
+    - Qwen: coders/qwen.md
+  - Configuration: configuration.md
+  - MCP Support: mcps.md
+  - Evaluations:
+    - Introduction: evaluations/index.md
+    - Examples: evaluations/examples.md
+    - Configuration Reference: evaluations/configuration.md
+  - API Reference: api-reference.md
+  - Further reading:
+    - Motivation: background/report.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            docstring_style: google
+            merge_init_into_class: true
+            show_signature_annotations: true
+
+repo_url: https://github.com/contextual-ai/metacoder
+repo_name: contextual-ai/metacoder

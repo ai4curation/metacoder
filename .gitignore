@@ -1,3 +1,4 @@
+workdir/
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -8,3 +9,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# MkDocs
+site/

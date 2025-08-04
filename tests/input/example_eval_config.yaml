@@ -1,0 +1,37 @@
+name: pubmed tools evals
+description: |
+  Evaluations for multiple pubmed MCPs
+
+coders:
+  claude: {}
+
+models:
+  gpt-4o:
+    provider: openai
+    name: claude-sonnet-20250219
+
+servers:
+  pubmed:
+    name: pubmed
+    command: uvx
+    args: [mcp-simple-pubmed]
+    env:
+      PUBMED_EMAIL: cjmungall@lbl.gov
+
+cases:
+  - name: "sanity"
+    metrics: [CorrectnessMetric]
+    input: "What is 1+1"
+    expected_output: "2"
+    threshold: 0.9
+  - name: "title"
+    metrics: [CorrectnessMetric]
+    input: "What is the title of PMID:28027860?"
+    expected_output: "From nocturnal frontal lobe epilepsy to Sleep-Related Hypermotor Epilepsy: A 35-year diagnostic challenge"
+    threshold: 0.9
+  - name: "table"
+    metrics: [CorrectnessMetric]
+    input: "In table 2 of PMID:28027860, what are the 3 levels of certainty"
+    expected_output: "Witnessed (possible); Video-documented (clinical); Video-EEG documented (confirmed)"
+    threshold: 0.9
+    

@@ -1,0 +1,28 @@
+name: dummy metric test
+description: |
+  Test evaluation using DummyMetric that always returns 1.0
+
+coders:
+  dummy: {}
+
+models:
+  test-model:
+    provider: openai
+    name: gpt-4
+
+cases:
+  - name: "test_always_pass"
+    metrics: [DummyMetric]
+    input: "This will always pass"
+    expected_output: "doesn't matter"
+    threshold: 0.5
+  - name: "test_high_threshold"
+    metrics: [DummyMetric]
+    input: "This should also pass even with high threshold"
+    expected_output: "still doesn't matter"
+    threshold: 0.9
+  - name: "multiple_metrics"
+    metrics: [DummyMetric, CorrectnessMetric]
+    input: "What is 2 + 2?"
+    expected_output: "4"
+    threshold: 0.7

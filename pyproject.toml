@@ -6,12 +6,34 @@ readme = "README.md"
 authors = [
     { name = "Chris Mungall", email = "cjm@berkeleybop.org" }
 ]
-requires-python = ">=3.9"
-dependencies = []
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1.8",
+    "deepeval>=3.3.4",
+    "evaluate>=0.4.5",
+    "fastmcp>=2.11.0",
+    "pydantic>=2.11.7",
+    "pyyaml>=6.0.2",
+    "ragas>=0.3.0",
+    "rouge-score>=0.1.2",
+]
 
 [project.scripts]
-metacoder = "metacoder:main"
+metacoder = "metacoder.metacoder:main"
+metacoder-mcp-demo-lookup = "metacoder.mcps.demo_lookup:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.16",
+    "mkdocstrings>=0.30.0",
+    "mkdocstrings-python>=1.14.0",
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "types-click>=7.1.8",
+    "types-pyyaml>=6.0.12.20250516",
+]

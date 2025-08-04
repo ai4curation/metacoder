@@ -3,8 +3,11 @@ from pathlib import Path
 import subprocess
 import time
 import logging
+import shutil
+from typing import Optional, Any
 
-from coders.base_coder import BaseCoder, CoderConfigObject, CoderOutput, FileType, change_directory
+from metacoder.coders.base_coder import BaseCoder, CoderConfigObject, CoderOutput, FileType, change_directory
+from metacoder.configuration import MCPConfig, MCPType
 
 
 
@@ -18,60 +21,106 @@ class GooseCoder(BaseCoder):
     For AWS bedrock, you may need to copy ~/.aws/
 
     """
+    
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if goose command is available."""
+        return shutil.which('goose') is not None
+    
+    @classmethod
+    def supports_mcp(cls) -> bool:
+        """GooseCoder supports MCP extensions."""
+        return True
+    
+    def instruction_files(self) -> dict[str, str]:
+        """Return instruction files as a dictionary of filename to content."""
+        return {}
+    
+    def mcp_config_to_goose_extension(self, mcp: MCPConfig) -> dict:
+        """Convert an MCPConfig to Goose extension format."""
+        extension = {
+            "name": mcp.name,
+            "enabled": mcp.enabled,
+            "timeout": 300,  # Default timeout
+            "type": "stdio" if mcp.type == MCPType.STDIO else mcp.type.value,
+        }
+        
+        if mcp.description:
+            extension["description"] = mcp.description
+            
+        if mcp.command:
+            extension["cmd"] = mcp.command
+            
+        if mcp.args:
+            extension["args"] = mcp.args
+            
+        if mcp.env:
+            extension["envs"] = mcp.env
+            extension["env_keys"] = list(mcp.env.keys())
+        else:
+            extension["envs"] = {}
+            extension["env_keys"] = []
+            
+        extension["bundled"] = None
+        
+        return extension
 
     def default_config_objects(self) -> list[CoderConfigObject]:
-        """
-        extensions:
-            developer:
-                bundled: true
-                display_name: Developer
-                enabled: true
-                name: developer
-                timeout: 300
-                type: builtin
-            pdfreader:
-                args:
-                - mcp-read-pdf
-                bundled: null
-                cmd: uvx
-                description: Read large and complex PDF documents
-                enabled: true
-                env_keys: []
-                envs: {}
-                name: pdfreader
-                timeout: 300
-                type: stdio
-        """
+        """Generate default config objects including MCP extensions."""
+        config_content: dict[str, Any] = {}
+        
+        # Map AI model configuration to Goose format
+        if self.config and self.config.ai_model:
+            model = self.config.ai_model
+            # Get provider as string
+            if isinstance(model.provider, str):
+                provider_str = model.provider
+            elif model.provider and hasattr(model.provider, 'name'):
+                provider_str = model.provider.name
+            else:
+                provider_str = "openai"  # default
+            
+            # Map provider names
+            if provider_str == "anthropic":
+                config_content["GOOSE_PROVIDER"] = "openai"
+                # Map Anthropic models to their full names
+                if "claude" in model.name:
+                    config_content["GOOSE_MODEL"] = f"anthropic/{model.name}"
+                else:
+                    config_content["GOOSE_MODEL"] = model.name
+            else:
+                config_content["GOOSE_PROVIDER"] = provider_str
+                config_content["GOOSE_MODEL"] = model.name
+        else:
+            # Default values
+            config_content["GOOSE_MODEL"] = "gpt-4o"
+            config_content["GOOSE_PROVIDER"] = "openai"
+        
+        # Start with built-in extensions
+        extensions = {
+            "developer": {
+                "bundled": True,
+                "display_name": "Developer",
+                "enabled": True,
+                "name": "developer",
+                "timeout": 300,
+                "type": "builtin",
+            }
+        }
+        
+        # Add MCP extensions if configured
+        if self.config and self.config.extensions:
+            for mcp in self.config.extensions:
+                if isinstance(mcp, MCPConfig) and mcp.enabled:
+                    extensions[mcp.name] = self.mcp_config_to_goose_extension(mcp)
+        
+        config_content["extensions"] = extensions
+        
         return [
             CoderConfigObject(
                 file_type=FileType.YAML,
                 relative_path=".config/goose/config.yaml",
-                content={
-                    "GOOSE_MODEL": "gpt-4o",
-                    "GOOSE_PROVIDER": "openai",
-                    "extensions": {
-                        "developer": {
-                            "bundled": True,
-                            "display_name": "Developer",
-                            "enabled": True,
-                            "name": "developer",
-                            "timeout": 300,
-                            "type": "builtin",
-                        },
-                        "pdfreader": {
-                            "args": ["mcp-read-pdf"],
-                            "bundled": None,
-                            "cmd": "uvx",
-                            "description": "Read large and complex PDF documents",
-                            "enabled": True,
-                            "env_keys": [],
-                            "envs": {},
-                            "name": "pdfreader",
-                            "timeout": 300,
-                            "type": "stdio",
-                        }
-                    }
-                }
+                content=config_content
             )
         ]
     
@@ -96,22 +145,35 @@ class GooseCoder(BaseCoder):
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)
             print(f"🦆 Command took {end_time - start_time} seconds")
             # look in output text for a file like: logging to ./.local/share/goose/sessions/20250613_120403.jsonl
-            session_file = None
+            session_file: Optional[Path] = None
             for line in result.stdout.split("\n"):
                 if "logging to" in line:
-                    session_file = line.split("logging to ")[1]
+                    session_file_str = line.split("logging to ")[1]
+                    session_file = Path(session_file_str)
                     break
-            if session_file:
-                session_file = Path(session_file)
-                if session_file.exists():
+            if session_file and session_file.exists():
                     with open(session_file, "r") as f:
-                        ao.structured_messages = [json.loads(line) for line in f]
+                        ao.structured_messages = [json.loads(line) for line in f if line.strip()]
+            
+            # Extract result text from structured messages
             if ao.structured_messages:
+                # Look for assistant messages
                 for message in ao.structured_messages:
-                    if "content" in message:
+                    if message.get("role") == "assistant" and "content" in message:
                         for content in message["content"]:
-                            if "text" in content:
-                                ao.result_text = content["text"]
+                            if isinstance(content, dict) and "text" in content:
+                                if ao.result_text:
+                                    ao.result_text += "\n" + content["text"]
+                                else:
+                                    ao.result_text = content["text"]
+                            elif isinstance(content, str):
+                                if ao.result_text:
+                                    ao.result_text += "\n" + content
+                                else:
+                                    ao.result_text = content
+            
+            # If no result text found in messages, use stdout as fallback
             if not ao.result_text:
-                raise ValueError("No result text found in goose output")
+                ao.result_text = ao.stdout
+                
             return ao

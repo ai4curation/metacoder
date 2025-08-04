@@ -8,40 +8,31 @@ import subprocess
 import sys
 import threading
 from typing import Any, Callable
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from coders.config import CoderConfig
+from metacoder.configuration import CoderConfig, CoderConfigObject, ConfigFileRole, FileType
 
 logger = logging.getLogger(__name__)
 
-class FileType(str, Enum):
-    """File type of the config object."""
-    TEXT = "text"
-    YAML = "yaml"
-    JSON = "json"
-    
-
-class CoderConfigObject(BaseModel):
-    """Base class for coder config objects."""
-    file_type: FileType = Field(FileType.TEXT, description="File type of the config object")
-    relative_path: str = Field(..., description="Path to the file relative to the workdir")
-    content: Any = Field(..., description="Content of the file")
 
 class CoderOutput(BaseModel):
     """Base class for coder outputs."""
     stdout: str = Field(..., description="Standard output from the coder")
     stderr: str = Field(..., description="Standard error from the coder")
-    result_text: str | None = Field(None, description="Result text from the coder")
-    total_cost_usd: float | None = Field(None, description="Total cost in USD")
-    success: bool | None = Field(None, description="Whether the coder ran successfully")
-    structured_messages: list[dict] | None = Field(None, description="Messages from the coder, e.g claude json output")
+    result_text: str | None = Field(default=None, description="Result text from the coder")
+    total_cost_usd: float | None = Field(default=None, description="Total cost in USD")
+    success: bool | None = Field(default=None, description="Whether the coder ran successfully")
+    structured_messages: list[dict] | None = Field(default=None, description="Messages from the coder, e.g claude json output")
 
 
 LOCK_FILE = ".lock"
     
 @contextmanager
 def change_directory(path: str):
-    """Context manager to temporarily change directory."""
+    """Context manager to temporarily change directory.
+    
+    Creates a lock file in the directory to prevent multiple processes from running in the same directory.
+    """
     original_dir = os.getcwd()
     Path(path).mkdir(parents=True, exist_ok=True)
     lock_file = Path(path) / LOCK_FILE
@@ -60,12 +51,25 @@ def change_directory(path: str):
         lock_file.unlink()
 
 class BaseCoder(BaseModel, ABC):
-    workdir: str = Field("workdir", description="Working dir ")
-    config: CoderConfig | None = Field(None, description="Config for the coder")
-    params: dict | None = Field(None, description="Parameters for the coder")
-    env: dict[str, str] | None = Field(None, description="Environment variables for the coder")
-    prompt: str | None = Field(None, description="Prompt for the coder")
-    config_objects: list[CoderConfigObject] | None = Field(None, description="Config objects (native) for the coder")
+    workdir: str = Field(default="workdir", description="Working dir ")
+    config: CoderConfig | None = Field(default=None, description="Config for the coder")
+    params: dict | None = Field(default=None, description="Parameters for the coder")
+    env: dict[str, str] | None = Field(default=None, description="Environment variables for the coder")
+    prompt: str | None = Field(default=None, description="Prompt for the coder")
+    config_objects: list[CoderConfigObject] | None = Field(default=None, description="Config objects (native) for the coder")
+    
+    @model_validator(mode='after')
+    def validate_mcp_support(self):
+        """Validate that MCP extensions are only used with coders that support them."""
+        if self.config and self.config.extensions:
+            mcp_extensions = [ext for ext in self.config.extensions if hasattr(ext, 'enabled') and ext.enabled]
+            if mcp_extensions and not self.supports_mcp():
+                raise ValueError(
+                    f"MCP extensions are configured but {self.__class__.__name__} does not support MCP. "
+                    f"Found {len(mcp_extensions)} enabled MCP extension(s). "
+                    f"Please use a coder that supports MCP (e.g., ClaudeCoder, GooseCoder) or remove MCP extensions from the configuration."
+                )
+        return self
 
     @property
     def instructions_path(self) -> Path:
@@ -74,6 +78,26 @@ class BaseCoder(BaseModel, ABC):
     @abstractmethod
     def run(self, input_text: str) -> CoderOutput:
         pass
+    
+    @abstractmethod
+    def instruction_files(self) -> dict[str, str]:
+        """Return instruction files as a dictionary of filename to content."""
+        pass
+
+    @classmethod
+    def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
+        """Return config files as a dictionary of filename/dirname to role."""
+        return {}
+    
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if this coder is available/installed on the system."""
+        return True  # Default to True, subclasses can override
+    
+    @classmethod
+    def supports_mcp(cls) -> bool:
+        """Check if this coder supports MCP extensions."""
+        return False  # Default to False, subclasses that support MCP should override
     
     def run_process(self, command: list[str], env: dict[str, str] | None = None) -> CoderOutput:
         """Run a process and return the output.
@@ -86,7 +110,7 @@ class BaseCoder(BaseModel, ABC):
             Tuple of stdout and stderr
 
         Example:
-            >>> from coders.dummy import DummyCoder
+            >>> from metacoder.coders.dummy import DummyCoder
             >>> coder = DummyCoder(workdir="tmp")
             >>> output = coder.run("hello")
             >>> output.stdout
@@ -106,8 +130,8 @@ class BaseCoder(BaseModel, ABC):
             universal_newlines=True
         )
         
-        stdout_lines = []
-        stderr_lines = []
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
         
         def stream_output(pipe, output_lines, stream):
             for line in iter(pipe.readline, ''):
@@ -133,10 +157,16 @@ class BaseCoder(BaseModel, ABC):
         stdout_thread.join()
         stderr_thread.join()
         
-        if return_code != 0:
-            raise subprocess.CalledProcessError(return_code, command)
+        stdout_text = "\n".join(stdout_lines)
+        stderr_text = "\n".join(stderr_lines)
         
-        return CoderOutput(stdout="\n".join(stdout_lines), stderr="\n".join(stderr_lines))
+        if return_code != 0:
+            error = subprocess.CalledProcessError(return_code, command)
+            error.stdout = stdout_text
+            error.stderr = stderr_text
+            raise error
+        
+        return CoderOutput(stdout=stdout_text, stderr=stderr_text)
     
     
     def all_instructions(self) -> str:
@@ -157,7 +187,7 @@ class BaseCoder(BaseModel, ABC):
 
         Example:
 
-            >>> from coders.dummy import DummyCoder
+            >>> from metacoder.coders.dummy import DummyCoder
             >>> coder = DummyCoder(workdir="tmp")
             >>> import os
             >>> # unset all environment variables
@@ -178,7 +208,9 @@ class BaseCoder(BaseModel, ABC):
         expanded_env = os.environ.copy()
         for key, value in env.items():
             if value.startswith("$"):
-                expanded_env[key] = os.getenv(value[1:])
+                env_value = os.getenv(value[1:])
+                if env_value is not None:
+                    expanded_env[key] = env_value
             else:
                 expanded_env[key] = value
         return expanded_env
@@ -196,10 +228,24 @@ class BaseCoder(BaseModel, ABC):
     
     def prepare_workdir(self):
         """Prepare the workdir for the coder."""
+        # Check if MCP extensions are configured but not supported
+        if self.config and self.config.extensions:
+            mcp_extensions = [ext for ext in self.config.extensions if hasattr(ext, 'enabled') and ext.enabled]
+            if mcp_extensions and not self.supports_mcp():
+                raise ValueError(
+                    f"MCP extensions are configured but {self.__class__.__name__} does not support MCP. "
+                    f"Found {len(mcp_extensions)} enabled MCP extension(s). "
+                    f"Please use a coder that supports MCP (e.g., ClaudeCoder, GooseCoder) or remove MCP extensions from the configuration."
+                )
+        
         if self.config_objects is None:
             self.config_objects = self.default_config_objects()
         print(f"🦆 Preparing workdir: {self.workdir}")
         with change_directory(self.workdir):
+            # clear old config objects
+            for path, _type in self.default_config_paths().items():
+                if path.exists():
+                    path.unlink()
             for config_object in self.config_objects:
                 path = Path(config_object.relative_path)
                 path.parent.mkdir(parents=True, exist_ok=True)

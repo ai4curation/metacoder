@@ -1,0 +1,36 @@
+name: multi_mcp_collection
+description: |
+  Example MCP collection with multiple servers for testing.
+
+servers:
+  - name: pubmed
+    description: PubMed search and retrieval
+    command: uvx
+    args: [mcp-simple-pubmed]
+    env:
+      PUBMED_EMAIL: cjmungall@lbl.gov
+    enabled: true
+    type: stdio
+    
+  - name: arxiv
+    description: ArXiv paper search
+    command: uvx
+    args: [mcp-arxiv]
+    enabled: true
+    type: stdio
+    
+  - name: filesystem
+    description: Local filesystem access
+    command: npx
+    args: [-y, "@modelcontextprotocol/server-filesystem"]
+    enabled: false  # Disabled by default for security
+    type: stdio
+    
+  - name: github
+    description: GitHub repository access
+    command: uvx
+    args: [mcp-github]
+    env:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+    enabled: true
+    type: stdio

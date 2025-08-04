@@ -1,0 +1,44 @@
+name: pubmed tools evals
+description: |
+  Evaluations for multiple pubmed MCPs
+
+coders:
+  claude: {}
+  goose: {}
+
+models:
+  gpt-4o:
+    provider: openai
+    name: gpt-4o
+
+servers:
+  mcp-simple-pubmed:
+    name: pubmed
+    command: uvx
+    args: [mcp-simple-pubmed]
+    env:
+      PUBMED_EMAIL: cjmungall@lbl.gov
+  ols-mcp:
+    name: ols
+    command: uvx
+    args: [mcp-ols]
+
+server_combinations:
+  - [mcp-simple-pubmed, ols-mcp]
+
+cases:
+  - name: "disease"
+    metrics: [CorrectnessMetric]
+    input: "According to PMID:35743164, What 3 diseases are associated with ITPR1 mutations? Give me disease names and MONDO IDs"
+    expected_output: |
+      MONDO:0011694 (spinocerebellar ataxia type 15/16, aka SCA15)
+      MONDO:0007298 (spinocerebellar ataxia type 29, aka SCA29)
+      MONDO:0008795 (aniridia-cerebellar ataxia-intellectual disability syndrome; aka Gillespie syndrome)
+
+    threshold: 0.7
+  - name: "table"
+    metrics: [CorrectnessMetric]
+    input: "What phenotypes are associated with p.E497K mutations in ITPR1, according to PMID:35743164. Give phenotype names and HPO IDs"
+    expected_output: "Severe motor delay, normal cognitive level, hypotonia, ataxia, postural tremor, slurred speech, nystagmus"
+    threshold: 0.7
+    

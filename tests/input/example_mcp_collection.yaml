@@ -1,0 +1,12 @@
+name: example_mcp_collection
+description: |
+  Example MCP collection for testing.
+
+servers:
+  - name: pubmed
+    command: uvx
+    args: [mcp-simple-pubmed]
+    env:
+      PUBMED_EMAIL: cjmungall@lbl.gov
+    enabled: true
+    type: stdio

@@ -1,0 +1,47 @@
+name: server combinations test
+description: |
+  Test evaluation for server_combinations feature using dummy coders
+
+coders:
+  dummy: {}
+
+models:
+  test-model:
+    provider: openai
+    name: gpt-4
+
+servers:
+  server-a:
+    name: server-a
+    command: echo
+    args: ["Server A"]
+    type: stdio
+  server-b:
+    name: server-b
+    command: echo
+    args: ["Server B"]
+    type: stdio
+  server-c:
+    name: server-c
+    command: echo
+    args: ["Server C"]
+    type: stdio
+
+server_combinations:
+  - []  # No servers
+  - [server-a]  # Just server A
+  - [server-b]  # Just server B
+  - [server-a, server-b]  # A and B together as alternatives
+  - [server-a, server-b, server-c]  # All three as alternatives
+
+cases:
+  - name: "simple_test"
+    metrics: [CorrectnessMetric]
+    input: "What is 2 + 2?"
+    expected_output: "4"
+    threshold: 0.8
+  - name: "echo_test"
+    metrics: [CorrectnessMetric]
+    input: "Echo hello world"
+    expected_output: "hello world"
+    threshold: 0.7
