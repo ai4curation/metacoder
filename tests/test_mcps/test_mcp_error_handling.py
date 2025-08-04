@@ -1,14 +1,11 @@
 """Test error handling for MCP configuration with unsupported coders."""
+
 import tempfile
 import pytest
 from pathlib import Path
 from click.testing import CliRunner
 
 from metacoder.metacoder import main
-from metacoder.coders.dummy import DummyCoder
-from metacoder.coders.qwen import QwenCoder
-from metacoder.coders.gemini import GeminiCoder
-from metacoder.coders.codex import CodexCoder
 
 
 @pytest.fixture
@@ -20,7 +17,7 @@ def runner():
 @pytest.fixture
 def mcp_config_file(tmp_path):
     """Create a temporary MCP config file for testing."""
-    config_content = f"""
+    config_content = """
 ai_model:
   name: gpt-4
   provider: openai
@@ -42,22 +39,28 @@ extensions:
 def test_mcp_not_supported_error(runner, mcp_config_file, coder_name):
     """Test that coders without MCP support raise an error when MCP is configured."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        result = runner.invoke(main, [
-            'Hello',
-            '--coder', coder_name,
-            '--config', mcp_config_file,
-            '--workdir', temp_dir
-        ])
-    
+        result = runner.invoke(
+            main,
+            [
+                "Hello",
+                "--coder",
+                coder_name,
+                "--config",
+                mcp_config_file,
+                "--workdir",
+                temp_dir,
+            ],
+        )
+
     # Debug output
     if result.exit_code != 1:
         print(f"Exit code: {result.exit_code}")
         print(f"Output: {result.output}")
         print(f"Exception: {result.exception}")
-    
+
     # Should fail with exit code 1
     assert result.exit_code == 1
-    
+
     # Should contain error message about MCP not being supported
     assert "MCP extensions are configured but" in result.output
     assert "does not support MCP" in result.output
@@ -76,20 +79,26 @@ extensions: []
 """
         config_file = Path(temp_dir) / "no_mcp_config.yaml"
         config_file.write_text(config_content)
-        
-        result = runner.invoke(main, [
-            'Hello',
-            '--coder', 'dummy',
-            '--config', str(config_file),
-            '--workdir', temp_dir
-        ])
-    
+
+        result = runner.invoke(
+            main,
+            [
+                "Hello",
+                "--coder",
+                "dummy",
+                "--config",
+                str(config_file),
+                "--workdir",
+                temp_dir,
+            ],
+        )
+
     # Debug output
     if result.exit_code != 0:
         print(f"Exit code: {result.exit_code}")
         print(f"Output: {result.output}")
         print(f"Exception: {result.exception}")
-    
+
     # Should succeed
     assert result.exit_code == 0
     assert "you said: Hello" in result.output
@@ -114,14 +123,20 @@ extensions:
 """
         config_file = Path(temp_dir) / "disabled_mcp_config.yaml"
         config_file.write_text(config_content)
-        
-        result = runner.invoke(main, [
-            'Hello',
-            '--coder', 'dummy',
-            '--config', str(config_file),
-            '--workdir', temp_dir
-        ])
-    
+
+        result = runner.invoke(
+            main,
+            [
+                "Hello",
+                "--coder",
+                "dummy",
+                "--config",
+                str(config_file),
+                "--workdir",
+                temp_dir,
+            ],
+        )
+
     # Should succeed since MCP is disabled
     assert result.exit_code == 0
     assert "you said: Hello" in result.output

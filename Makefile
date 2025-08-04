@@ -1,7 +1,7 @@
 RUN = poetry run
 
 all: test
-test: pytest doctest mypy
+test: pytest doctest format mypy
 test-full: test pytest-llm
 
 pytest:
@@ -9,6 +9,9 @@ pytest:
 
 mypy:
 	$(RUN) mypy src tests
+
+format:
+	$(RUN) ruff check .
 
 codespell:
 	$(RUN) tox -e codespell

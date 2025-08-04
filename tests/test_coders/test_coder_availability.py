@@ -1,5 +1,5 @@
 """Tests for coder availability checking."""
-import pytest
+
 from unittest.mock import patch
 
 from metacoder.coders.goose import GooseCoder
@@ -15,40 +15,40 @@ def test_dummy_always_available():
     assert DummyCoder.is_available() is True
 
 
-@patch('shutil.which')
+@patch("shutil.which")
 def test_goose_availability_check(mock_which):
     """Test GooseCoder availability check."""
     # Test when goose is available
-    mock_which.return_value = '/usr/local/bin/goose'
+    mock_which.return_value = "/usr/local/bin/goose"
     assert GooseCoder.is_available() is True
-    mock_which.assert_called_with('goose')
-    
+    mock_which.assert_called_with("goose")
+
     # Test when goose is not available
     mock_which.return_value = None
     assert GooseCoder.is_available() is False
 
 
-@patch('shutil.which')
+@patch("shutil.which")
 def test_claude_availability_check(mock_which):
     """Test ClaudeCoder availability check."""
     # Test when claude is available
-    mock_which.return_value = '/usr/local/bin/claude'
+    mock_which.return_value = "/usr/local/bin/claude"
     assert ClaudeCoder.is_available() is True
-    mock_which.assert_called_with('claude')
-    
+    mock_which.assert_called_with("claude")
+
     # Test when claude is not available
     mock_which.return_value = None
     assert ClaudeCoder.is_available() is False
 
 
-@patch('shutil.which')
+@patch("shutil.which")
 def test_codex_availability_check(mock_which):
     """Test CodexCoder availability check."""
     # Test when codex is available
-    mock_which.return_value = '/usr/local/bin/codex'
+    mock_which.return_value = "/usr/local/bin/codex"
     assert CodexCoder.is_available() is True
-    mock_which.assert_called_with('codex')
-    
+    mock_which.assert_called_with("codex")
+
     # Test when codex is not available
     mock_which.return_value = None
     assert CodexCoder.is_available() is False
@@ -57,33 +57,37 @@ def test_codex_availability_check(mock_which):
 def test_all_coders_have_availability_method():
     """Test that all coder classes have is_available method."""
     from metacoder.metacoder import AVAILABLE_CODERS
-    
+
     for coder_name, coder_class in AVAILABLE_CODERS.items():
-        assert hasattr(coder_class, 'is_available'), f"{coder_name} missing is_available method"
-        assert callable(coder_class.is_available), f"{coder_name}.is_available is not callable"
+        assert hasattr(
+            coder_class, "is_available"
+        ), f"{coder_name} missing is_available method"
+        assert callable(
+            coder_class.is_available
+        ), f"{coder_name}.is_available is not callable"
 
 
-@patch('shutil.which')
+@patch("shutil.which")
 def test_gemini_availability_check(mock_which):
     """Test GeminiCoder availability check."""
     # Test when gemini is available
-    mock_which.return_value = '/usr/local/bin/gemini'
+    mock_which.return_value = "/usr/local/bin/gemini"
     assert GeminiCoder.is_available() is True
-    mock_which.assert_called_with('gemini')
-    
+    mock_which.assert_called_with("gemini")
+
     # Test when gemini is not available
     mock_which.return_value = None
     assert GeminiCoder.is_available() is False
 
 
-@patch('shutil.which')
+@patch("shutil.which")
 def test_qwen_availability_check(mock_which):
     """Test QwenCoder availability check."""
     # Test when qwen is available
-    mock_which.return_value = '/usr/local/bin/qwen'
+    mock_which.return_value = "/usr/local/bin/qwen"
     assert QwenCoder.is_available() is True
-    mock_which.assert_called_with('qwen')
-    
+    mock_which.assert_called_with("qwen")
+
     # Test when qwen is not available
     mock_which.return_value = None
     assert QwenCoder.is_available() is False
@@ -98,6 +102,6 @@ def test_actual_availability():
     print(f"  CodexCoder: {CodexCoder.is_available()}")
     print(f"  GeminiCoder: {GeminiCoder.is_available()}")
     print(f"  QwenCoder: {QwenCoder.is_available()}")
-    
+
     # At least dummy should always be available
     assert DummyCoder.is_available() is True

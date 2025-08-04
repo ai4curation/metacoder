@@ -1,4 +1,5 @@
 """Registry of available coders."""
+
 from typing import Dict, Type
 
 from metacoder.coders.base_coder import BaseCoder

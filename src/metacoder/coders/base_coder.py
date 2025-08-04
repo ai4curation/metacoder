@@ -1,36 +1,47 @@
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from enum import Enum
 import logging
 import os
 from pathlib import Path
 import subprocess
 import sys
 import threading
-from typing import Any, Callable
 from pydantic import BaseModel, Field, model_validator
 
-from metacoder.configuration import CoderConfig, CoderConfigObject, ConfigFileRole, FileType
+from metacoder.configuration import (
+    CoderConfig,
+    CoderConfigObject,
+    ConfigFileRole,
+    FileType,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class CoderOutput(BaseModel):
     """Base class for coder outputs."""
+
     stdout: str = Field(..., description="Standard output from the coder")
     stderr: str = Field(..., description="Standard error from the coder")
-    result_text: str | None = Field(default=None, description="Result text from the coder")
+    result_text: str | None = Field(
+        default=None, description="Result text from the coder"
+    )
     total_cost_usd: float | None = Field(default=None, description="Total cost in USD")
-    success: bool | None = Field(default=None, description="Whether the coder ran successfully")
-    structured_messages: list[dict] | None = Field(default=None, description="Messages from the coder, e.g claude json output")
+    success: bool | None = Field(
+        default=None, description="Whether the coder ran successfully"
+    )
+    structured_messages: list[dict] | None = Field(
+        default=None, description="Messages from the coder, e.g claude json output"
+    )
 
 
 LOCK_FILE = ".lock"
-    
+
+
 @contextmanager
 def change_directory(path: str):
     """Context manager to temporarily change directory.
-    
+
     Creates a lock file in the directory to prevent multiple processes from running in the same directory.
     """
     original_dir = os.getcwd()
@@ -38,7 +49,9 @@ def change_directory(path: str):
     lock_file = Path(path) / LOCK_FILE
     logger.info(f"🔒 Obtaining lock for {path}; current_dir={original_dir}")
     if lock_file.exists():
-        print(f"🚫 Lock file {lock_file} exists in {path}. If you are SURE no other process is running in this directory, delete the lock file and try again.")
+        print(
+            f"🚫 Lock file {lock_file} exists in {path}. If you are SURE no other process is running in this directory, delete the lock file and try again."
+        )
         sys.exit(1)
     # write the current process id to the lock file
     lock_file.write_text(str(os.getpid()))
@@ -50,19 +63,28 @@ def change_directory(path: str):
         os.chdir(original_dir)
         lock_file.unlink()
 
+
 class BaseCoder(BaseModel, ABC):
     workdir: str = Field(default="workdir", description="Working dir ")
     config: CoderConfig | None = Field(default=None, description="Config for the coder")
     params: dict | None = Field(default=None, description="Parameters for the coder")
-    env: dict[str, str] | None = Field(default=None, description="Environment variables for the coder")
+    env: dict[str, str] | None = Field(
+        default=None, description="Environment variables for the coder"
+    )
     prompt: str | None = Field(default=None, description="Prompt for the coder")
-    config_objects: list[CoderConfigObject] | None = Field(default=None, description="Config objects (native) for the coder")
-    
-    @model_validator(mode='after')
+    config_objects: list[CoderConfigObject] | None = Field(
+        default=None, description="Config objects (native) for the coder"
+    )
+
+    @model_validator(mode="after")
     def validate_mcp_support(self):
         """Validate that MCP extensions are only used with coders that support them."""
         if self.config and self.config.extensions:
-            mcp_extensions = [ext for ext in self.config.extensions if hasattr(ext, 'enabled') and ext.enabled]
+            mcp_extensions = [
+                ext
+                for ext in self.config.extensions
+                if hasattr(ext, "enabled") and ext.enabled
+            ]
             if mcp_extensions and not self.supports_mcp():
                 raise ValueError(
                     f"MCP extensions are configured but {self.__class__.__name__} does not support MCP. "
@@ -78,7 +100,7 @@ class BaseCoder(BaseModel, ABC):
     @abstractmethod
     def run(self, input_text: str) -> CoderOutput:
         pass
-    
+
     @abstractmethod
     def instruction_files(self) -> dict[str, str]:
         """Return instruction files as a dictionary of filename to content."""
@@ -88,24 +110,26 @@ class BaseCoder(BaseModel, ABC):
     def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
         """Return config files as a dictionary of filename/dirname to role."""
         return {}
-    
+
     @classmethod
     def is_available(cls) -> bool:
         """Check if this coder is available/installed on the system."""
         return True  # Default to True, subclasses can override
-    
+
     @classmethod
     def supports_mcp(cls) -> bool:
         """Check if this coder supports MCP extensions."""
         return False  # Default to False, subclasses that support MCP should override
-    
-    def run_process(self, command: list[str], env: dict[str, str] | None = None) -> CoderOutput:
+
+    def run_process(
+        self, command: list[str], env: dict[str, str] | None = None
+    ) -> CoderOutput:
         """Run a process and return the output.
-        
+
         Args:
             command: Command to run
             env: Environment variables to use
-        
+
         Returns:
             Tuple of stdout and stderr
 
@@ -127,52 +151,49 @@ class BaseCoder(BaseModel, ABC):
             text=True,
             env=env,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
         )
-        
+
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
-        
+
         def stream_output(pipe, output_lines, stream):
-            for line in iter(pipe.readline, ''):
+            for line in iter(pipe.readline, ""):
                 print(line.rstrip(), file=stream)
                 output_lines.append(line)
             pipe.close()
-        
+
         # Start threads for both stdout and stderr
         stdout_thread = threading.Thread(
-            target=stream_output, 
-            args=(process.stdout, stdout_lines, sys.stdout)
+            target=stream_output, args=(process.stdout, stdout_lines, sys.stdout)
         )
         stderr_thread = threading.Thread(
-            target=stream_output, 
-            args=(process.stderr, stderr_lines, sys.stderr)
+            target=stream_output, args=(process.stderr, stderr_lines, sys.stderr)
         )
-        
+
         stdout_thread.start()
         stderr_thread.start()
-        
+
         # Wait for process and threads to complete
         return_code = process.wait()
         stdout_thread.join()
         stderr_thread.join()
-        
+
         stdout_text = "\n".join(stdout_lines)
         stderr_text = "\n".join(stderr_lines)
-        
+
         if return_code != 0:
             error = subprocess.CalledProcessError(return_code, command)
             error.stdout = stdout_text
             error.stderr = stderr_text
             raise error
-        
+
         return CoderOutput(stdout=stdout_text, stderr=stderr_text)
-    
-    
+
     def all_instructions(self) -> str:
         """
         Get all instructions from the instruction files.
-        
+
         Args:
             None
 
@@ -180,7 +201,7 @@ class BaseCoder(BaseModel, ABC):
             A string of all instruction files concatenated together
         """
         return "\n\n".join(self.instruction_files().values())
-    
+
     def expand_env(self, env: dict[str, str] | None = None) -> dict[str, str]:
         """
         Expand environment variables in the coder config.
@@ -214,30 +235,34 @@ class BaseCoder(BaseModel, ABC):
             else:
                 expanded_env[key] = value
         return expanded_env
-    
+
     def expand_prompt(self, input_text: str) -> str:
         """Expand environment variables in the prompt."""
         if not self.prompt:
             return input_text
         return self.prompt.format(input_text=input_text)
-    
+
     @abstractmethod
     def default_config_objects(self) -> list[CoderConfigObject]:
         """Default config objects for the coder."""
         raise NotImplementedError("default_config_objects is not implemented")
-    
+
     def prepare_workdir(self):
         """Prepare the workdir for the coder."""
         # Check if MCP extensions are configured but not supported
         if self.config and self.config.extensions:
-            mcp_extensions = [ext for ext in self.config.extensions if hasattr(ext, 'enabled') and ext.enabled]
+            mcp_extensions = [
+                ext
+                for ext in self.config.extensions
+                if hasattr(ext, "enabled") and ext.enabled
+            ]
             if mcp_extensions and not self.supports_mcp():
                 raise ValueError(
                     f"MCP extensions are configured but {self.__class__.__name__} does not support MCP. "
                     f"Found {len(mcp_extensions)} enabled MCP extension(s). "
                     f"Please use a coder that supports MCP (e.g., ClaudeCoder, GooseCoder) or remove MCP extensions from the configuration."
                 )
-        
+
         if self.config_objects is None:
             self.config_objects = self.default_config_objects()
         print(f"🦆 Preparing workdir: {self.workdir}")
@@ -249,15 +274,18 @@ class BaseCoder(BaseModel, ABC):
             for config_object in self.config_objects:
                 path = Path(config_object.relative_path)
                 path.parent.mkdir(parents=True, exist_ok=True)
-                print(f"🦆 Writing config object: {config_object.relative_path} type={config_object.file_type}")
+                print(
+                    f"🦆 Writing config object: {config_object.relative_path} type={config_object.file_type}"
+                )
                 if config_object.file_type == FileType.TEXT:
                     path.write_text(config_object.content)
                 elif config_object.file_type == FileType.YAML:
                     import yaml
+
                     path.write_text(yaml.dump(config_object.content))
                 elif config_object.file_type == FileType.JSON:
                     import json
+
                     path.write_text(json.dumps(config_object.content))
                 else:
                     raise ValueError(f"Unknown file type: {config_object.file_type}")
-

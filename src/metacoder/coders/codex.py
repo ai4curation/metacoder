@@ -1,27 +1,31 @@
 import json
 from pathlib import Path
-import subprocess
 import time
 import logging
 import shutil
 
-from metacoder.coders.base_coder import BaseCoder, CoderConfigObject, CoderOutput, FileType, change_directory
-
+from metacoder.coders.base_coder import (
+    BaseCoder,
+    CoderConfigObject,
+    CoderOutput,
+    FileType,
+)
 
 
 logger = logging.getLogger(__name__)
+
 
 class CodexCoder(BaseCoder):
     """
     For AWS bedrock, you may need to copy ~/.aws/
 
     """
-    
+
     @classmethod
     def is_available(cls) -> bool:
         """Check if codex command is available."""
-        return shutil.which('codex') is not None
-    
+        return shutil.which("codex") is not None
+
     def instruction_files(self) -> dict[str, str]:
         """Return instruction files as a dictionary of filename to content."""
         return {}
@@ -80,12 +84,12 @@ class CodexCoder(BaseCoder):
                             "name": "pdfreader",
                             "timeout": 300,
                             "type": "stdio",
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             )
         ]
-    
+
     def run(self, input_text: str) -> CoderOutput:
         """
         Run claude code with the given input text.
@@ -102,7 +106,9 @@ class CodexCoder(BaseCoder):
         start_time = time.time()
         ao = self.run_process(command, env)
         # parse the jsonl output
-        ao.structured_messages = [json.loads(line) for line in ao.stdout.split("\n") if line]
+        ao.structured_messages = [
+            json.loads(line) for line in ao.stdout.split("\n") if line
+        ]
         total_cost_usd = None
         is_error = None
         for message in ao.structured_messages:
