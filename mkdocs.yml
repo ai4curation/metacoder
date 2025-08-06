@@ -34,6 +34,7 @@ nav:
     - Qwen: coders/qwen.md
   - Configuration: configuration.md
   - MCP Support: mcps.md
+  - Troubleshooting: troubleshooting.md
   - Evaluations:
     - Introduction: evaluations/index.md
     - Examples: evaluations/examples.md

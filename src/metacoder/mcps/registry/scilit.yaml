@@ -1,0 +1,22 @@
+name: scilit
+servers:
+  - name: pdfreader
+    command: npx
+    args: [mcp-read-pdf]
+    env: {}
+    timeout: 300
+  - name: artl
+    command: uvx
+    args: [artl-mcp]
+    env: {}
+    timeout: 300
+  - name: biomcp
+    command: uv
+    args: ['run', '--with', biomcp-python, biomcp, run]
+    env: {}
+    timeout: 300
+  - name: simple-pubmed
+    command: uvx
+    args: [mcp-simple-pubmed]
+    env:
+      PUBMED_EMAIL: yourname@example.com

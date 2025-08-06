@@ -1,54 +1,76 @@
 # Metacoder
 
-A unified interface for AI coding assistants that abstracts over tool-specific configurations.
+![Metacoder Logo](docs/assets/metacoder-logo.png)
 
-## Motivation
-
-AI coding assistants like Goose, Claude, and others are powerful but each has its own configuration format, command-line interface, and setup requirements. Metacoder provides:
-
-- **Unified CLI**: Single command interface for multiple AI coders
-- **Configuration abstraction**: Consistent config format across different tools
-- **Tool discovery**: Automatically detect which AI assistants are available
-- **Simplified setup**: Manage working directories and contexts consistently
-
-## Quick Start
+A unified interface for command line AI coding assistants (claude code, gemini-cli, codex, goose, qwen-coder)
 
 ```bash
-# Install
-pip install metacoder
+# Use default coder
+metacoder "Write a Python function to calculate fibonacci numbers" -w my-scripts/
+...
 
-# List available coders
+# list coders
 metacoder list-coders
+Available coders:
+  ✅ goose
+  ✅ claude
+  ✅ codex
+  ✅ gemini
+  ✅ qwen
+  ✅ dummy
 
-# Use with default coder (goose)
-metacoder "Write a hello world program in Python"
+# With a specific coder
+metacoder "Write a Python function to calculate fibonacci numbers" -c claude -w my-scripts/
+...
 
-# Use specific coder
-metacoder "Fix the bug in main.py" --coder claude
+# Using MCPs
+metacoder "Fix issue 1234" -w path/to/my-repo --mcp-collection github_mcps.yaml
+...
 
-# Use with config file
-metacoder "Analyze this codebase" --config myconfig.yaml
-
-# Use with MCP extensions
-metacoder "Search for papers on transformers" --mcp-collection research_mcps.yaml
+# Using coders for scientific QA, with a literature search MCP
+metacoder "what diseases are associated with ITPR1 mutations" --mcp-collection lit_search_mcps.yaml
+...
 ```
 
-## Evaluations
+## Why Metacoder?
 
-Metacoder includes a powerful evaluation framework for comparing AI coders across different tasks and metrics:
+Each AI coding assistant has its own:
+
+- Configuration format
+- Command-line interface
+- Working directory setup
+- Means of configuring MCPs
+
+Metacoder provides a single interface to multiple AI assistants. This makes it easier to:
+
+- switch between agent tools in [GitHub actions pipelines](https://ai4curation.github.io/aidocs/how-tos/set-up-github-actions/)
+- perform matrixed [evaluation](https://ai4curation.github.io/metacoder/evaluations) of different agents and/or MCPs on different tasks
+
+One of the main use cases for metacoder is evaluating *semantic coding agents*, see:
+
+Mungall, C. (2025, July 22). Open Knowledge Bases in the Age of Generative AI (BOSC/BOKR Keynote) (abridged version). Intelligent Systems for Molecular Biology 2025 (ISMB/ECCB2025), Liverpool, UK. Zenodo. <https://doi.org/10.5281/zenodo.16461373>
+
+Mungall, C. (2025, May 28). How to make your KG interoperable: Ontologies and Semantic Standards. NIH Workshop on Knowledge Networks, Rockville. Zenodo. <https://doi.org/10.5281/zenodo.15554695>
+
+
+## Features
+
+- Unified CLI for all supported coders
+- Consistent [configuration](https://ai4curation.github.io/metacoder/configuration) format (YAML-based)
+- Unified [MCP configuration](https://ai4curation.github.io/metacoder/mcps)
+- Standardized working directory management
+
+
+## Evaluation Framework
+
+Metacoder includes a comprehensive evaluation framework for systematically testing and comparing AI coders, MCPs, and models.
 
 ```bash
-# Run evaluations
+# Run evaluation suite
 metacoder eval tests/input/example_eval_config.yaml
-
-# Test specific coders
-metacoder eval my_evals.yaml -c claude -c goose
-
-# Custom output location
-metacoder eval my_evals.yaml -o results.yaml
 ```
 
-Example evaluation config:
+Example evaluation configuration:
 
 ```yaml
 name: pubmed tools evals
@@ -56,6 +78,7 @@ description: Testing coders with PubMed MCP integration
 
 coders:
   claude: {}
+  goose: {}
 
 models:
   gpt-4o:
@@ -78,42 +101,10 @@ cases:
     threshold: 0.9
 ```
 
-## Available Coders
+## Getting Started
 
-- **goose** - Goose AI assistant
-- **claude** - Anthropic's Claude
-- **codex** - OpenAI Codex
-- **gemini** - Google Gemini
-- **qwen** - Alibaba Qwen
-- **dummy** - Test implementation
-
-## Installation
-
-```bash
-# Using pip
-pip install metacoder
-
-# Using uv
-uv add metacoder
-```
-
-## Development
-
-```bash
-# Clone the repo
-git clone https://github.com/cmungall/metacoder
-cd metacoder
-
-# Install with dev dependencies
-uv add --dev .
-
-# Run tests
-uv run pytest
-
-# Build docs
-uv run mkdocs serve
-```
-
-## Documentation
-
-Full documentation is available at [https://cmungall.github.io/metacoder](https://cmungall.github.io/metacoder)
+- [Installation and Setuphttps://ai4curation.github.io/metacoder/getting-started)
+- [Supported Coders](https://ai4curation.github.io/metacoder/coders/)
+- [Configuration Guide](https://ai4curation.github.io/metacoder/configuration)
+- [MCP Support](https://ai4curation.github.io/metacoder/mcps) - Extend your AI coders with additional tools
+- [Evaluations](https://ai4curation.github.io/metacoder/evaluations/) - Test and compare AI coders

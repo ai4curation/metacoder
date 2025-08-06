@@ -8,10 +8,10 @@ import copy
 import importlib
 import logging
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
+from pydantic import BaseModel
 import yaml
 from deepeval import evaluate
 from deepeval.metrics import BaseMetric
@@ -103,8 +103,8 @@ def create_coder(coder_name: str, workdir: str, config=None) -> BaseCoder:
     return coder
 
 
-@dataclass
-class EvalResult:
+
+class EvalResult(BaseModel):
     """Result of a single evaluation."""
 
     model: str
@@ -280,6 +280,7 @@ class EvalRunner:
                 actual_output=actual_output,
                 expected_output=case.expected_output,
                 execution_time=execution_time,
+                execution_metadata=output,
             )
             results.append(result)
 
@@ -407,22 +408,7 @@ class EvalRunner:
         # Convert to list of dicts
         results_data = []
         for result in results:
-            results_data.append(
-                {
-                    "model": result.model,
-                    "coder": result.coder,
-                    "case_name": result.case_name,
-                    "metric_name": result.metric_name,
-                    "score": result.score,
-                    "passed": result.passed,
-                    "reason": result.reason,
-                    "actual_output": result.actual_output,
-                    "expected_output": result.expected_output,
-                    "execution_time": result.execution_time,
-                    "error": result.error,
-                    "servers": result.servers,
-                }
-            )
+            results_data.append(result.model_dump())
 
         # Save as YAML
         with open(output_path, "w") as f:

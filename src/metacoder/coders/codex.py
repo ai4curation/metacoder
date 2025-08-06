@@ -26,9 +26,6 @@ class CodexCoder(BaseCoder):
         """Check if codex command is available."""
         return shutil.which("codex") is not None
 
-    def instruction_files(self) -> dict[str, str]:
-        """Return instruction files as a dictionary of filename to content."""
-        return {}
 
     @property
     def instructions_path(self) -> Path:

@@ -1,4 +1,4 @@
-RUN = poetry run
+RUN = uv run
 
 all: test
 test: pytest doctest format mypy

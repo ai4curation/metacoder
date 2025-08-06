@@ -29,10 +29,6 @@ class GeminiCoder(BaseCoder):
         """Check if gemini command is available."""
         return shutil.which("gemini") is not None
 
-    def instruction_files(self) -> dict[str, str]:
-        """Return instruction files as a dictionary of filename to content."""
-        return {}
-
     def default_config_objects(self) -> list[CoderConfigObject]:
         """Default configuration for Gemini."""
         return [

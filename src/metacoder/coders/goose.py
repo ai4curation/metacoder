@@ -10,9 +10,10 @@ from metacoder.coders.base_coder import (
     CoderConfigObject,
     CoderOutput,
     FileType,
+    ToolUse,
     change_directory,
 )
-from metacoder.configuration import MCPConfig, MCPType
+from metacoder.configuration import ConfigFileRole, MCPConfig, MCPType
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,8 @@ class GooseCoder(BaseCoder):
     the working directory
 
     For AWS bedrock, you may need to copy ~/.aws/
+
+    ```
 
     """
 
@@ -37,9 +40,6 @@ class GooseCoder(BaseCoder):
         """GooseCoder supports MCP extensions."""
         return True
 
-    def instruction_files(self) -> dict[str, str]:
-        """Return instruction files as a dictionary of filename to content."""
-        return {}
 
     def mcp_config_to_goose_extension(self, mcp: MCPConfig) -> dict:
         """Convert an MCPConfig to Goose extension format."""
@@ -69,6 +69,14 @@ class GooseCoder(BaseCoder):
         extension["bundled"] = None
 
         return extension
+    
+    @classmethod
+    def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
+        return {
+            Path(".goosehints"): ConfigFileRole.PRIMARY_INSTRUCTION,
+            Path(".settings/goose"): ConfigFileRole.CONFIG,
+            Path(".settings/goose/config.yaml"): ConfigFileRole.CONFIG,
+        }
 
     def default_config_objects(self) -> list[CoderConfigObject]:
         """Generate default config objects including MCP extensions."""
@@ -86,7 +94,8 @@ class GooseCoder(BaseCoder):
                 provider_str = "openai"  # default
 
             # Map provider names
-            if provider_str == "anthropic":
+            if provider_str == "proxy":
+                # TODO: this is the proxy route...
                 config_content["GOOSE_PROVIDER"] = "openai"
                 # Map Anthropic models to their full names
                 if "claude" in model.name:
@@ -148,7 +157,7 @@ class GooseCoder(BaseCoder):
             result = self.run_process(command, env)
             end_time = time.time()
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)
-            print(f"🦆 Command took {end_time - start_time} seconds")
+            logger.info(f"🦆 Command took {end_time - start_time} seconds")
             # look in output text for a file like: logging to ./.local/share/goose/sessions/20250613_120403.jsonl
             session_file: Optional[Path] = None
             for line in result.stdout.split("\n"):
@@ -182,5 +191,75 @@ class GooseCoder(BaseCoder):
             # If no result text found in messages, use stdout as fallback
             if not ao.result_text:
                 ao.result_text = ao.stdout
+
+            # Extract tool uses from structured messages
+            if ao.structured_messages:
+                tool_uses = []
+                pending_tool_uses = {}  # Map tool request id to tool data
+                
+                for message in ao.structured_messages:
+                    # Check for tool requests in assistant messages
+                    if message.get("role") == "assistant" and "content" in message:
+                        for content in message.get("content", []):
+                            if isinstance(content, dict) and content.get("type") == "toolRequest":
+                                tool_id = content.get("id")
+                                tool_call = content.get("toolCall", {})
+                                
+                                if tool_call.get("status") == "success":
+                                    tool_value = tool_call.get("value", {})
+                                    tool_name = tool_value.get("name", "")
+                                    tool_args = tool_value.get("arguments", {})
+                                    
+                                    # Store pending tool use
+                                    pending_tool_uses[tool_id] = {
+                                        "name": tool_name,
+                                        "arguments": tool_args,
+                                        "success": False,  # Default until we see result
+                                        "error": None,
+                                        "result": None
+                                    }
+                    
+                    # Check for tool responses in user messages
+                    elif message.get("role") == "user" and "content" in message:
+                        for content in message.get("content", []):
+                            if isinstance(content, dict) and content.get("type") == "toolResponse":
+                                tool_id = content.get("id")
+                                if tool_id in pending_tool_uses:
+                                    tool_data = pending_tool_uses[tool_id]
+                                    tool_result = content.get("toolResult", {})
+                                    
+                                    # Update with result
+                                    if tool_result.get("status") == "success":
+                                        tool_data["success"] = True
+                                        # Extract text from value array
+                                        result_value = tool_result.get("value", [])
+                                        if isinstance(result_value, list):
+                                            result_texts = []
+                                            for item in result_value:
+                                                if isinstance(item, dict) and item.get("type") == "text":
+                                                    result_texts.append(item.get("text", ""))
+                                            tool_data["result"] = "\n".join(result_texts) if result_texts else str(result_value)
+                                        else:
+                                            tool_data["result"] = str(result_value)
+                                    else:
+                                        tool_data["success"] = False
+                                        tool_data["error"] = tool_result.get("error", "Tool execution failed")
+                                        tool_data["result"] = None
+                                    
+                                    # Create ToolUse object
+                                    tool_use = ToolUse(**tool_data)
+                                    tool_uses.append(tool_use)
+                                    
+                                    # Remove from pending
+                                    del pending_tool_uses[tool_id]
+                
+                # Add any remaining pending tool uses (shouldn't happen in normal flow)
+                for tool_data in pending_tool_uses.values():
+                    tool_data["error"] = "No result received for tool call"
+                    tool_use = ToolUse(**tool_data)
+                    tool_uses.append(tool_use)
+                
+                if tool_uses:
+                    ao.tool_uses = tool_uses
 
             return ao

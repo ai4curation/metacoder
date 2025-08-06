@@ -10,7 +10,6 @@ from metacoder.metacoder import create_coder
 from metacoder.coders.claude import ClaudeCoder
 from metacoder.coders.goose import GooseCoder
 from metacoder.coders.gemini import GeminiCoder
-from metacoder.coders.qwen import QwenCoder
 from metacoder.coders.codex import CodexCoder
 from metacoder.coders.dummy import DummyCoder
 from metacoder.configuration import CoderConfig, AIModelConfig
@@ -21,7 +20,7 @@ ALL_CODERS = [
     ("claude", ClaudeCoder),
     ("goose", GooseCoder),
     ("gemini", GeminiCoder),
-    ("qwen", QwenCoder),
+    # ("qwen", QwenCoder), ## TODO: fix qwen
     ("codex", CodexCoder),
     ("dummy", DummyCoder),
 ]

@@ -1,0 +1,13 @@
+name: ontology
+description: Ontology MCPs
+servers:
+  - name: ols
+    command: uvx
+    args: [ols-mcp]
+    env: {}
+    timeout: 300
+  - name: bioportal
+    command: uvx
+    args: [bioportal-mcp]
+    env: {}
+    timeout: 300

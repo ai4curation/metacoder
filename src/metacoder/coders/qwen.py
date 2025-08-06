@@ -33,10 +33,6 @@ class QwenCoder(BaseCoder):
         """Check if qwen command is available."""
         return shutil.which("qwen") is not None
 
-    def instruction_files(self) -> dict[str, str]:
-        """Return instruction files as a dictionary of filename to content."""
-        return {}
-
     def default_config_objects(self) -> list[CoderConfigObject]:
         """Default configuration for Qwen."""
         # Qwen doesn't need config files in workdir like Gemini

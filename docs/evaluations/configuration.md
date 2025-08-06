@@ -145,6 +145,13 @@ metacoder eval config.yaml -w ./eval_workspace
 metacoder eval config.yaml -v
 ```
 
+## Important Notes
+
+The output of evaluations can be large, in particular the field `execution_metadata`, which has a full trace of
+everything the agent did, including tool responses. For something like pubmed full text retrieval this can be large.
+
+You may wish to partition evals into sub-evals
+
 ## See Also
 
 - [Examples](examples.md) - Complete configuration examples

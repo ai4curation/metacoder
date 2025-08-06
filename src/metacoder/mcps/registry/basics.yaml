@@ -1,0 +1,21 @@
+name: scilit
+servers:
+  - name: taskmasterai
+    command: npx
+    args:
+    - -y
+    - --package=task-master-ai
+    - task-master-ai
+    description: ''
+    env: {}
+    timeout: 300
+  - name: fetch
+    command: uvx
+    args:
+    - mcp-server-fetch
+    bundled: null
+    description: Web content fetching and processing capabilities
+    enabled: false
+    env: {}
+    timeout: 300
+    type: stdio
