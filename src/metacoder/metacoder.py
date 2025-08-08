@@ -243,6 +243,12 @@ def cli(ctx):
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option("--quiet", "-q", is_flag=True, help="Quiet mode")
+@click.option(
+    "--instructions",
+    "-i",
+    type=click.Path(exists=True),
+    help="Path to instructions file to load and pass to the coder",
+)
 def run(
     prompt: str,
     coder: str,
@@ -255,6 +261,7 @@ def run(
     model: Optional[str],
     verbose: bool,
     quiet: bool,
+    instructions: Optional[str],
 ):
     """
     Run a prompt with the specified coder.
@@ -272,6 +279,10 @@ def run(
     metacoder run "Fix the bug in main.py" --coder goose --config goose_config.yaml
 
     \b
+    # Use custom instructions from a file
+    metacoder run "Write tests" --coder claude --instructions instructions.md
+
+    \b
     # Use MCP collection
     metacoder run "Search for papers on LLMs" --mcp-collection mcps.yaml
 
@@ -282,6 +293,10 @@ def run(
     \b
     # Load MCPs from registry
     metacoder run "Fetch a webpage" --registry metacoder.basics --enable-mcp fetch
+
+    \b
+    # Combine instructions with MCP configuration
+    metacoder run "Analyze data" --instructions guide.md --mcp-collection tools.yaml
 
     \b
     # Load all MCPs from registry
@@ -418,6 +433,16 @@ def run(
         coder_instance = create_coder(coder, str(workdir), coder_config)
     except Exception as e:
         raise click.ClickException(f"Failed to create coder: {e}")
+
+    # Load instructions if provided
+    if instructions:
+        try:
+            with open(instructions, "r") as f:
+                instructions_content = f.read()
+            coder_instance.set_instructions(instructions_content)
+            click.echo(f"📋 Loaded instructions from: {instructions}")
+        except Exception as e:
+            raise click.ClickException(f"Failed to load instructions file: {e}")
 
     # Run the coder
     click.echo(f"🚀 Running prompt: {prompt}")

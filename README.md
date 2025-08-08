@@ -23,6 +23,10 @@ Available coders:
 metacoder "Write a Python function to calculate fibonacci numbers" -c claude -w my-scripts/
 ...
 
+# With custom instructions
+metacoder "Refactor this code" -c claude --instructions coding_guidelines.md
+...
+
 # Using MCPs
 metacoder "Fix issue 1234" -w path/to/my-repo --mcp-collection github_mcps.yaml
 ...

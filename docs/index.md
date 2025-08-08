@@ -23,6 +23,10 @@ Available coders:
 metacoder "Write a Python function to calculate fibonacci numbers" -c claude -w my-scripts/
 ...
 
+# With custom instructions
+metacoder "Refactor this code" -c claude --instructions coding_guidelines.md
+...
+
 # Using MCPs
 metacoder "Fix issue 1234" -w path/to/my-repo --mcp-collection github_mcps.yaml
 ...
@@ -57,6 +61,7 @@ Mungall, C. (2025, May 28). How to make your KG interoperable: Ontologies and Se
 
 - Unified CLI for all supported coders
 - Consistent [configuration](configuration.md) format (YAML-based)
+- Custom instructions support via `--instructions` flag
 - Unified [MCP configuration](mcps.md)
 - Standardized working directory management
 

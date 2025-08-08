@@ -4,6 +4,7 @@ import time
 import logging
 import shutil
 import re
+from typing import Any
 
 from metacoder.coders.base_coder import (
     BaseCoder,
@@ -12,6 +13,7 @@ from metacoder.coders.base_coder import (
     FileType,
     change_directory,
 )
+from metacoder.configuration import ConfigFileRole, MCPConfig, MCPType
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +23,33 @@ class GeminiCoder(BaseCoder):
     """
     Google Gemini AI assistant integration.
 
-    Note: Requires gemini CLI to be installed.
+    Gemini-specific configuration:
+
+    You can provide the following files in your configuration directory:
+
+    - `GEMINI.md` - Primary instructions for the assistant
+    - `.gemini/settings.json` - Configuration including MCP servers
+    - `.gemini/commands/` - Custom commands directory
+
+    MCP Support:
+    
+    Gemini CLI supports MCP (Model Context Protocol) servers through the
+    mcpServers configuration in .gemini/settings.json. When MCPs are configured
+    through Metacoder, they will be automatically added to the settings file.
+
+    The Gemini CLI expects MCP servers to be configured in the following format:
+    {
+        "mcpServers": {
+            "server_name": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-name"],
+                "env": {"API_KEY": "${API_KEY}"},
+                "timeout": 30000
+            }
+        }
+    }
+
+    Note: Requires gemini CLI to be installed (npm install -g @google/gemini-cli).
     """
 
     @classmethod
@@ -29,15 +57,72 @@ class GeminiCoder(BaseCoder):
         """Check if gemini command is available."""
         return shutil.which("gemini") is not None
 
-    def default_config_objects(self) -> list[CoderConfigObject]:
-        """Default configuration for Gemini."""
-        return [
-            CoderConfigObject(
-                file_type=FileType.YAML,
-                relative_path=".codex/config.yaml",
-                content={"model": "gemini-2.5-pro", "provider": "google"},
+    @classmethod
+    def supports_mcp(cls) -> bool:
+        """GeminiCoder supports MCP extensions."""
+        return True
+
+    @classmethod
+    def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
+        return {
+            Path("GEMINI.md"): ConfigFileRole.PRIMARY_INSTRUCTION,
+            Path(".gemini/settings.json"): ConfigFileRole.CONFIG,
+            Path(".gemini/commands"): ConfigFileRole.CONFIG,
+        }
+
+    def mcp_config_to_gemini_format(self, mcp: MCPConfig) -> dict[str, Any]:
+        """Convert MCPConfig to Gemini's MCP server format."""
+        server_config: dict[str, Any] = {}
+
+        # For stdio type MCPs
+        if mcp.type == MCPType.STDIO and mcp.command:
+            server_config["command"] = mcp.command
+            if mcp.args:
+                server_config["args"] = mcp.args
+            if mcp.env:
+                server_config["env"] = mcp.env
+            # Add optional timeout if needed
+            server_config["timeout"] = 30000  # 30 seconds default
+
+        # For HTTP type MCPs
+        elif mcp.type == MCPType.HTTP:
+            raise NotImplementedError(
+                "HTTP MCPs are not supported for Gemini CLI yet"
             )
-        ]
+
+        return server_config
+
+    def default_config_objects(self) -> list[CoderConfigObject]:
+        """Generate config objects including MCP configuration."""
+        config_objects = []
+        
+        # Create .gemini/settings.json if we have MCP extensions
+        settings_content: dict[str, Any] = {}
+        
+        # Add MCP servers configuration if extensions are present
+        if self.config and self.config.extensions:
+            mcp_servers = {}
+            for mcp in self.config.extensions:
+                if mcp.enabled:
+                    mcp_servers[mcp.name] = self.mcp_config_to_gemini_format(mcp)
+            
+            if mcp_servers:
+                settings_content["mcpServers"] = mcp_servers
+        
+        # Add settings.json if we have content to write
+        if settings_content:
+            config_objects.append(
+                CoderConfigObject(
+                    file_type=FileType.JSON,
+                    relative_path=".gemini/settings.json",
+                    content=settings_content,
+                )
+            )
+        
+        # Add GEMINI.md if present in config
+        # This could contain instructions specific to the task
+        
+        return config_objects
 
     def run(self, input_text: str) -> CoderOutput:
         """
@@ -50,14 +135,15 @@ class GeminiCoder(BaseCoder):
             # Gemini expects HOME to be current directory for config
             env["HOME"] = "."
 
-            # Validate required files
-            if not Path("./.codex/config.yaml").exists():
-                raise ValueError("Codex config.yaml file not found")
-
             text = self.expand_prompt(input_text)
-            command = ["gemini", "-d", "-m", "gemini-2.5-pro", "-y", "-p", text]
+            
+            # Build the command
+            # The gemini CLI uses conversational interface, so we need to handle it differently
+            # For now, we'll use echo to pipe the prompt
+            command = ["sh", "-c", f'echo "{text}" | gemini']
 
-            logger.info(f"🤖 Running command: {' '.join(command)}")
+            logger.info("💎 Running command: gemini with prompt")
+            logger.debug(f"💎 Full command: {' '.join(command)}")
             start_time = time.time()
 
             try:
@@ -72,7 +158,7 @@ class GeminiCoder(BaseCoder):
                 )
 
             end_time = time.time()
-            print(f"🤖 Command took {end_time - start_time} seconds")
+            logger.info(f"💎 Command took {end_time - start_time} seconds")
 
             # Parse the output
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)

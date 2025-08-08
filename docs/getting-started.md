@@ -51,6 +51,9 @@ metacoder "Analyze this project" --workdir ./myproject
 # Use configuration file
 metacoder "Build feature X" --config config.yaml
 
+# Use custom instructions file
+metacoder "Review code" --instructions guidelines.md
+
 # Use MCP extensions
 metacoder "Search for papers on LLMs" --mcp-collection research_mcps.yaml
 ```

@@ -35,7 +35,7 @@ extensions:
     return str(config_file)
 
 
-@pytest.mark.parametrize("coder_name", ["qwen", "gemini", "codex"])
+@pytest.mark.parametrize("coder_name", ["qwen", "codex"])
 def test_mcp_not_supported_error(runner, mcp_config_file, coder_name):
     """Test that coders without MCP support raise an error when MCP is configured."""
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -102,6 +102,37 @@ extensions: []
     # Should succeed
     assert result.exit_code == 0
     assert "you said: Hello" in result.output
+
+
+@pytest.mark.parametrize("coder_name", ["claude", "goose", "gemini"])
+def test_mcp_supported_coders(runner, mcp_config_file, coder_name):
+    """Test that coders with MCP support work fine when MCP is configured."""
+    # Note: This test verifies that these coders don't fail with MCP configuration
+    # It doesn't verify actual MCP functionality
+    with tempfile.TemporaryDirectory() as temp_dir:
+        result = runner.invoke(
+            main,
+            [
+                "Hello",
+                "--coder",
+                coder_name,
+                "--config",
+                mcp_config_file,
+                "--workdir",
+                temp_dir,
+            ],
+        )
+
+    # Debug output
+    if result.exit_code != 0:
+        print(f"Exit code: {result.exit_code}")
+        print(f"Output: {result.output}")
+        print(f"Exception: {result.exception}")
+
+    # Should succeed (or at least not fail due to MCP not being supported)
+    # The actual execution might fail for other reasons (e.g., command not found)
+    # but should not fail with "does not support MCP" error
+    assert "does not support MCP" not in result.output
 
 
 def test_disabled_mcp_extension_works(runner):

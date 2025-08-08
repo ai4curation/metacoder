@@ -1,4 +1,6 @@
+from pathlib import Path
 from metacoder.coders.base_coder import BaseCoder, CoderConfigObject, CoderOutput, ToolUse
+from metacoder.configuration import ConfigFileRole
 
 
 class DummyCoder(BaseCoder):
@@ -18,14 +20,34 @@ class DummyCoder(BaseCoder):
         """DummyCoder supports MCP for testing purposes."""
         return True
 
+    @classmethod
+    def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
+        return {
+            Path("INSTRUCTIONS.md"): ConfigFileRole.PRIMARY_INSTRUCTION,
+        }
+
     def default_config_objects(self) -> list[CoderConfigObject]:
         return []
 
     def run(self, input_text: str) -> CoderOutput:
+        # Check if instructions were set
+        instructions_content = None
+        if self.config_objects:
+            for obj in self.config_objects:
+                if obj.relative_path == "INSTRUCTIONS.md" or obj.relative_path == str(Path("INSTRUCTIONS.md")):
+                    instructions_content = obj.content
+                    break
+        
+        # Create response based on whether instructions exist
+        if instructions_content:
+            response = f"Instructions loaded: {instructions_content}\nProcessing: {input_text}"
+        else:
+            response = f"you said: {input_text}"
+            
         output = CoderOutput(
-            stdout="you said: " + input_text,
+            stdout=response,
             stderr="",
-            result_text="you said: " + input_text,
+            result_text=response,
         )
         
         # Add fake tool uses if input mentions tools, MCP, or specific services
