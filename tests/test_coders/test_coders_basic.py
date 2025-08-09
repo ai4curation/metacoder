@@ -12,6 +12,7 @@ from metacoder.coders.goose import GooseCoder
 from metacoder.coders.gemini import GeminiCoder
 from metacoder.coders.codex import CodexCoder
 from metacoder.coders.dummy import DummyCoder
+from metacoder.coders.opencode import OpencodeCoder
 from metacoder.configuration import CoderConfig, AIModelConfig
 
 
@@ -23,6 +24,7 @@ ALL_CODERS = [
     # ("qwen", QwenCoder), ## TODO: fix qwen
     ("codex", CodexCoder),
     ("dummy", DummyCoder),
+    ("opencode", OpencodeCoder),
 ]
 
 # Coders that require LLM access (all except dummy)
