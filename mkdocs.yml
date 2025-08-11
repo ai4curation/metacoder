@@ -39,6 +39,7 @@ nav:
     - Introduction: evaluations/index.md
     - Examples: evaluations/examples.md
     - Configuration Reference: evaluations/configuration.md
+    - Framework Comparison: comparison.md
   - API Reference: api-reference.md
   - Further reading:
     - Motivation: background/report.md
