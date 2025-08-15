@@ -24,10 +24,10 @@ metacoder "Write a Python function to calculate fibonacci numbers" -c claude -w 
 ...
 
 # With custom instructions
-metacoder "Refactor this code" -c claude --instructions coding_guidelines.md
+metacoder "Refactor this code" -c claude --instructions coding_guidelines.md -w my-repo
 ...
 
-# Using MCPs
+# Using MCPs (e.g. GitHub MCP)
 metacoder "Fix issue 1234" -w path/to/my-repo --mcp-collection github_mcps.yaml
 ...
 

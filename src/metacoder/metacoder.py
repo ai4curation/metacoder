@@ -239,7 +239,7 @@ def cli(ctx):
     "--provider", "-p", type=str, help="AI provider (e.g., openai, anthropic, google)"
 )
 @click.option(
-    "--model", type=str, help="AI model name (e.g., gpt-4, claude-3-opus, gemini-pro)"
+    "--model", type=str, help="AI model name (e.g., gpt-4o, claude-4-sonnet, gemini-2.5pro)"
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option("--quiet", "-q", is_flag=True, help="Quiet mode")
