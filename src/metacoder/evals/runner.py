@@ -59,30 +59,27 @@ class DummyMetric(BaseMetric):
         return self.success
 
 
-correctness_metric = GEval(
-    name="Correctness",
-    criteria="Determine whether the actual output is factually correct based on the expected output.",
-    # NOTE: you can only provide either criteria or evaluation_steps, and not both
-    evaluation_steps=[
-        "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
-        "You should also heavily penalize omission of detail",
-        "Vague language, or contradicting OPINIONS, are OK",
-    ],
-    threshold=0.8,
-    evaluation_params=[
-        LLMTestCaseParams.INPUT,
-        LLMTestCaseParams.ACTUAL_OUTPUT,
-        LLMTestCaseParams.EXPECTED_OUTPUT,
-    ],
-)
-
-# instances
-dummy_metric = DummyMetric(threshold=0.5)
-
-METRICS = {
-    "CorrectnessMetric": correctness_metric,
-    "DummyMetric": dummy_metric,
-}
+def get_default_metrics() -> Dict[str, BaseMetric]:
+    """Get default metrics. Creates instances lazily to avoid network calls during import."""
+    return {
+        "CorrectnessMetric": GEval(
+            name="Correctness",
+            criteria="Determine whether the actual output is factually correct based on the expected output.",
+            # NOTE: you can only provide either criteria or evaluation_steps, and not both
+            evaluation_steps=[
+                "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
+                "You should also heavily penalize omission of detail",
+                "Vague language, or contradicting OPINIONS, are OK",
+            ],
+            threshold=0.8,
+            evaluation_params=[
+                LLMTestCaseParams.INPUT,
+                LLMTestCaseParams.ACTUAL_OUTPUT,
+                LLMTestCaseParams.EXPECTED_OUTPUT,
+            ],
+        ),
+        "DummyMetric": DummyMetric(threshold=0.5),
+    }
 
 
 def create_coder(coder_name: str, workdir: str, config=None) -> BaseCoder:
@@ -226,8 +223,9 @@ class EvalRunner:
 
         # Run each metric
         for metric_name in case.metrics:
-            if metric_name in METRICS:
-                metric = METRICS[metric_name]
+            default_metrics = get_default_metrics()
+            if metric_name in default_metrics:
+                metric = default_metrics[metric_name]
             else:
                 # Get metric class and instantiate
                 metric_class = self.get_metric_class(metric_name)
