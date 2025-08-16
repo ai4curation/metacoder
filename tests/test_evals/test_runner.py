@@ -1,6 +1,9 @@
 """Tests for the evaluation runner.
 
 This uses only dummy coders, so can be used in non-integration contexts.
+
+TODO: some of these are marked llm because they use an LLM in the eval
+phase, even if they use a dummy coder - figure a way to have a dummy LLM Eval too
 """
 
 import pytest
@@ -137,6 +140,7 @@ class TestEvalRunner:
         test_case = runner.create_test_case(eval_case, "4")
         assert test_case.retrieval_context == ["Math fact 1", "Math fact 2"]
 
+    @pytest.mark.llm
     def test_run_single_eval_with_dummy(self, simple_config, tmp_path):
         """Test running a single evaluation with dummy coder."""
         runner = EvalRunner()
@@ -244,6 +248,7 @@ class TestEvalRunner:
         assert data["results"][0]["model"] == "model1"
         assert data["results"][0]["score"] == 0.9
 
+    @pytest.mark.llm
     def test_run_all_evals_with_dummy(self, simple_config, tmp_path):
         """Test running all evaluations with dummy coder."""
         runner = EvalRunner()
