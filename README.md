@@ -4,6 +4,8 @@
 
 A unified interface for command line AI coding assistants (claude code, gemini-cli, codex, goose, qwen-coder)
 
+Read [the Metacoder post on Medium](https://medium.com/@cmungall/we-love-vibe-coding-so-much-we-vibe-coded-a-wrapper-for-vibe-coders-we-call-it-metacoder-b9973591755a)
+
 ```bash
 # Use default coder
 metacoder "Write a Python function to calculate fibonacci numbers" -w my-scripts/
