@@ -59,12 +59,12 @@ def test_all_coders_have_availability_method():
     from metacoder.metacoder import AVAILABLE_CODERS
 
     for coder_name, coder_class in AVAILABLE_CODERS.items():
-        assert hasattr(
-            coder_class, "is_available"
-        ), f"{coder_name} missing is_available method"
-        assert callable(
-            coder_class.is_available
-        ), f"{coder_name}.is_available is not callable"
+        assert hasattr(coder_class, "is_available"), (
+            f"{coder_name} missing is_available method"
+        )
+        assert callable(coder_class.is_available), (
+            f"{coder_name}.is_available is not callable"
+        )
 
 
 @patch("shutil.which")

@@ -103,7 +103,6 @@ def create_coder(coder_name: str, workdir: str, config=None) -> BaseCoder:
     return coder
 
 
-
 class EvalResult(BaseModel):
     """Result of a single evaluation."""
 

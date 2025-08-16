@@ -61,8 +61,6 @@ def test_hallucination_eval(metric_cls):
     print(yaml.dump(results.model_dump()))
 
 
-
-
 correctness_metric = GEval(
     name="Correctness",
     criteria="Determine whether the actual output is factually correct based on the expected output.",

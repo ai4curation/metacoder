@@ -147,6 +147,7 @@ class ClaudeCoder(BaseCoder):
             # time the command
             start_time = time.time()
             ao = self.run_process(command, env)
+
             # parse the jsonl output
             def parse_jsonl_line(text: str) -> dict[str, Any]:
                 try:
@@ -154,17 +155,20 @@ class ClaudeCoder(BaseCoder):
                     return result
                 except json.JSONDecodeError:
                     return {"original": text, "error": "JSONDecodeError"}
+
             ao.structured_messages = [
                 parse_jsonl_line(line) for line in ao.stdout.split("\n") if line
             ]
-            ao.structured_messages = [m for m in ao.structured_messages if m is not None]
+            ao.structured_messages = [
+                m for m in ao.structured_messages if m is not None
+            ]
             total_cost_usd = None
             is_error = None
-            
+
             # Extract tool uses
             tool_uses = []
             pending_tool_uses = {}  # Map tool_use_id to tool data
-            
+
             for message in ao.structured_messages:
                 if "total_cost_usd" in message:
                     total_cost_usd = message["total_cost_usd"]
@@ -172,7 +176,7 @@ class ClaudeCoder(BaseCoder):
                     is_error = message["is_error"]
                 if "result" in message:
                     ao.result_text = message["result"]
-                
+
                 # Check for tool_use in assistant messages
                 if message.get("type") == "assistant" and message.get("message"):
                     msg_content = message["message"].get("content", [])
@@ -182,16 +186,16 @@ class ClaudeCoder(BaseCoder):
                                 tool_id = content_item.get("id")
                                 tool_name = content_item.get("name", "")
                                 tool_input = content_item.get("input", {})
-                                
+
                                 # Store pending tool use
                                 pending_tool_uses[tool_id] = {
                                     "name": tool_name,
                                     "arguments": tool_input,
                                     "success": False,  # Default to False until we see result
                                     "error": None,
-                                    "result": None
+                                    "result": None,
                                 }
-                
+
                 # Check for tool_result in user messages
                 elif message.get("type") == "user" and message.get("message"):
                     msg_content = message["message"].get("content", [])
@@ -201,31 +205,35 @@ class ClaudeCoder(BaseCoder):
                                 tool_id = content_item.get("tool_use_id")
                                 if tool_id in pending_tool_uses:
                                     tool_data = pending_tool_uses[tool_id]
-                                    
+
                                     # Update with result
                                     is_tool_error = content_item.get("is_error", False)
                                     tool_data["success"] = not is_tool_error
-                                    tool_data["result"] = content_item.get("content", "")
-                                    
+                                    tool_data["result"] = content_item.get(
+                                        "content", ""
+                                    )
+
                                     if is_tool_error:
-                                        tool_data["error"] = content_item.get("content", "Tool error occurred")
-                                    
+                                        tool_data["error"] = content_item.get(
+                                            "content", "Tool error occurred"
+                                        )
+
                                     # Create ToolUse object
                                     tool_use = ToolUse(**tool_data)
                                     tool_uses.append(tool_use)
-                                    
+
                                     # Remove from pending
                                     del pending_tool_uses[tool_id]
-            
+
             # Add any remaining pending tool uses (shouldn't happen in normal flow)
             for tool_data in pending_tool_uses.values():
                 tool_data["error"] = "No result received for tool call"
                 tool_use = ToolUse(**tool_data)
                 tool_uses.append(tool_use)
-            
+
             if tool_uses:
                 ao.tool_uses = tool_uses
-                
+
             end_time = time.time()
             logger.info(f"🤖 Command took {end_time - start_time} seconds")
             ao.total_cost_usd = total_cost_usd

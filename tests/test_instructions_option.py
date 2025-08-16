@@ -21,7 +21,7 @@ def test_instructions_option_with_dummy_coder(runner):
         instructions_file = Path(temp_dir) / "test_instructions.md"
         instructions_content = "# Test Instructions\n\nBe helpful and concise."
         instructions_file.write_text(instructions_content)
-        
+
         # Run with instructions
         result = runner.invoke(
             main,
@@ -36,7 +36,7 @@ def test_instructions_option_with_dummy_coder(runner):
                 temp_dir,
             ],
         )
-        
+
         # Check that instructions were loaded
         assert result.exit_code == 0
         assert "Loaded instructions from:" in result.output
@@ -58,7 +58,7 @@ def test_no_instructions_still_works(runner):
                 temp_dir,
             ],
         )
-        
+
         assert result.exit_code == 0
         assert "you said: Hello" in result.output
         assert "Instructions loaded:" not in result.output
@@ -80,7 +80,7 @@ def test_instructions_file_not_found(runner):
                 temp_dir,
             ],
         )
-        
+
         # Should fail with appropriate error
         assert result.exit_code != 0
         assert "does not exist" in result.output
@@ -98,11 +98,11 @@ ai_model:
 extensions: []
 """
         config_file.write_text(config_content)
-        
+
         # Create instructions file
         instructions_file = Path(temp_dir) / "instructions.md"
         instructions_file.write_text("Custom instructions")
-        
+
         result = runner.invoke(
             main,
             [
@@ -118,6 +118,6 @@ extensions: []
                 temp_dir,
             ],
         )
-        
+
         assert result.exit_code == 0
         assert "Loaded instructions from:" in result.output

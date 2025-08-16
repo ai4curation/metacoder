@@ -51,16 +51,16 @@ def load_mcp_collection(collection_path: Path) -> MCPCollectionConfig:
 
 def load_mcp_registry(registry_path: str) -> MCPCollectionConfig:
     """Load MCPs from the registry based on a path pattern.
-    
+
     Args:
         registry_path: Path pattern like 'metacoder' (all) or 'metacoder.basics'
-    
+
     Returns:
         MCPCollectionConfig containing all matched MCPs
     """
     # Base directory for registry
     registry_base = Path(__file__).parent / "mcps" / "registry"
-    
+
     # Convert dot notation to file path
     if registry_path == "metacoder":
         # Load all yaml files in registry
@@ -68,21 +68,21 @@ def load_mcp_registry(registry_path: str) -> MCPCollectionConfig:
     else:
         # Convert metacoder.basics to basics.yaml
         if registry_path.startswith("metacoder."):
-            registry_path = registry_path[len("metacoder."):]
+            registry_path = registry_path[len("metacoder.") :]
         yaml_files = [registry_base / f"{registry_path}.yaml"]
-    
+
     # Collect all MCPs
     all_mcps = []
     for yaml_file in yaml_files:
         if not yaml_file.exists():
             raise click.ClickException(f"Registry file not found: {yaml_file}")
-        
+
         try:
             with open(yaml_file, "r") as f:
                 data = yaml.safe_load(f)
         except yaml.YAMLError as e:
             raise click.ClickException(f"Invalid YAML in {yaml_file}: {e}")
-        
+
         # The registry files contain a list of MCP extensions directly
         if isinstance(data, list):
             for mcp_data in data:
@@ -99,7 +99,7 @@ def load_mcp_registry(registry_path: str) -> MCPCollectionConfig:
                 logger.warning(f"Invalid MCP in {yaml_file}: {e}")
     for mcp in all_mcps:
         mcp.enabled = False
-    
+
     # Create a collection config
     collection_name = f"Registry: {registry_path}"
     return MCPCollectionConfig(name=collection_name, description=None, servers=all_mcps)
@@ -239,7 +239,9 @@ def cli(ctx):
     "--provider", "-p", type=str, help="AI provider (e.g., openai, anthropic, google)"
 )
 @click.option(
-    "--model", type=str, help="AI model name (e.g., gpt-4o, claude-4-sonnet, gemini-2.5pro)"
+    "--model",
+    type=str,
+    help="AI model name (e.g., gpt-4o, claude-4-sonnet, gemini-2.5pro)",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option("--quiet", "-q", is_flag=True, help="Quiet mode")
@@ -323,7 +325,7 @@ def run(
         raise click.ClickException("Cannot use both verbose and quiet mode")
     if verbose:
         logging.basicConfig(level=logging.DEBUG)
-    elif quiet: # quiet mode is a bit different, it's just no output
+    elif quiet:  # quiet mode is a bit different, it's just no output
         logging.basicConfig(level=logging.WARNING)
     else:
         logging.basicConfig(level=logging.INFO)
@@ -358,26 +360,29 @@ def run(
             click.echo(
                 f"   Enabling MCPs: {', '.join(enabled_list)} (all enabled by default)"
             )
-    
+
     # Load MCPs from registry if provided
     if registry:
         click.echo(f"📚 Loading MCPs from registry: {registry}")
         registry_config = load_mcp_registry(registry)
-        
+
         # Merge with existing MCP collection if any
         if mcp_collection_config:
             # Merge the servers lists
             for mcp in registry_config.servers:
                 # Avoid duplicates by name
-                if not any(existing.name == mcp.name for existing in mcp_collection_config.servers):
+                if not any(
+                    existing.name == mcp.name
+                    for existing in mcp_collection_config.servers
+                ):
                     mcp_collection_config.servers.append(mcp)
         else:
             mcp_collection_config = registry_config
-        
+
         # Show available MCPs from registry
         registry_mcps = [mcp.name for mcp in registry_config.servers]
         click.echo(f"   Registry MCPs: {', '.join(registry_mcps)}")
-        
+
         # Note that registry MCPs are not enabled by default
         if not enable_mcp:
             click.echo("   Use -e/--enable-mcp to enable specific MCPs")
@@ -421,7 +426,7 @@ def run(
         )
 
     if coder_config and coder_config.extensions:
-        for mcp in coder_config.extensions :
+        for mcp in coder_config.extensions:
             # use emoji to indicate enabled/disabled
             if mcp.enabled:
                 click.echo(f" ✅ MCP: {mcp.name}")
@@ -476,7 +481,9 @@ def run(
         click.echo("\n📋 Tool uses:")
         for tool_use in result.tool_uses:
             success = "✅" if tool_use.success else "❌"
-            click.echo(f"  {success} {tool_use.name} with arguments: {tool_use.arguments}")
+            click.echo(
+                f"  {success} {tool_use.name} with arguments: {tool_use.arguments}"
+            )
             if tool_use.error:
                 click.echo(f"    Error: {tool_use.error}")
 
@@ -485,7 +492,7 @@ def run(
             f"\n📋 Structured messages ({len(result.structured_messages)} total)"
         )
         for i, msg in enumerate(result.structured_messages):
-            click.echo(f"  {i+1}. {msg}")
+            click.echo(f"  {i + 1}. {msg}")
 
 
 @cli.command("list-coders")
@@ -588,10 +595,10 @@ def eval_command(config: str, output: str, workdir: str, coders: tuple, verbose:
     click.echo("\n📈 Summary:")
     click.echo(f"   Total: {summary['total_evaluations']}")
     click.echo(
-        f"   Passed: {summary['passed']} ({summary['passed']/summary['total_evaluations']*100:.1f}%)"
+        f"   Passed: {summary['passed']} ({summary['passed'] / summary['total_evaluations'] * 100:.1f}%)"
     )
     click.echo(
-        f"   Failed: {summary['failed']} ({summary['failed']/summary['total_evaluations']*100:.1f}%)"
+        f"   Failed: {summary['failed']} ({summary['failed'] / summary['total_evaluations'] * 100:.1f}%)"
     )
     if summary["errors"] > 0:
         click.echo(f"   Errors: {summary['errors']} ⚠️")
@@ -640,22 +647,22 @@ def eval_command(config: str, output: str, workdir: str, coders: tuple, verbose:
 def introspect_mcp(mcp_spec: str, registry: Optional[str], timeout: int, verbose: bool):
     """
     Introspect an MCP server to list its available tools, resources, and prompts.
-    
+
     MCP_SPEC can be:
     - A URL (http://localhost:8080)
     - A command (uvx mcp-server-fetch)
     - An MCP name when used with --registry
-    
+
     Examples:
-    
+
     \b
     # Introspect a running MCP server
     metacoder introspect-mcp http://localhost:8080
-    
+
     \b
     # Introspect an MCP from registry
     metacoder introspect-mcp fetch --registry metacoder.basics
-    
+
     \b
     # Introspect a command-based MCP
     metacoder introspect-mcp "uvx mcp-server-fetch"
@@ -665,18 +672,24 @@ def introspect_mcp(mcp_spec: str, registry: Optional[str], timeout: int, verbose
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-    
+
     # Run the introspection with proper cleanup
     import os
     import sys
-    
+
     # Suppress the specific asyncio warning by running with -W flag
     env = os.environ.copy()
-    env['PYTHONWARNINGS'] = 'ignore::RuntimeWarning:asyncio.base_subprocess'
-    
+    env["PYTHONWARNINGS"] = "ignore::RuntimeWarning:asyncio.base_subprocess"
+
     # Run in a subprocess to isolate the asyncio event loop
     import subprocess
-    args = [sys.executable, "-W", "ignore::RuntimeWarning:asyncio.base_subprocess", "-c", f"""
+
+    args = [
+        sys.executable,
+        "-W",
+        "ignore::RuntimeWarning:asyncio.base_subprocess",
+        "-c",
+        f"""
 import asyncio
 import sys
 sys.path.insert(0, {repr(str(Path(__file__).parent.parent))})
@@ -688,26 +701,26 @@ try:
 except Exception as e:
     print(f"Error: {{e}}", file=sys.stderr)
     sys.exit(1)
-"""]
-    
+""",
+    ]
+
     try:
         # Run with stderr captured to filter out asyncio warnings
         result = subprocess.run(
-            args, 
-            env=env, 
-            timeout=timeout + 5,
-            stderr=subprocess.PIPE,
-            text=True
+            args, env=env, timeout=timeout + 5, stderr=subprocess.PIPE, text=True
         )
-        
+
         # Filter out the specific asyncio warning from stderr
         if result.stderr:
             error_lines = []
             skip_next = 0
             lines = result.stderr.splitlines()
-            
+
             for i, line in enumerate(lines):
-                if "Exception ignored in: <function BaseSubprocessTransport.__del__" in line:
+                if (
+                    "Exception ignored in: <function BaseSubprocessTransport.__del__"
+                    in line
+                ):
                     # Skip this line and the rest of the traceback
                     skip_next = 100  # Skip many lines to catch the full traceback
                 elif skip_next > 0:
@@ -717,12 +730,12 @@ except Exception as e:
                         skip_next = 0  # Stop skipping after this line
                 else:
                     error_lines.append(line)
-            
+
             # Print any remaining stderr
             if error_lines:
                 for line in error_lines:
                     click.echo(line, err=True)
-        
+
         if result.returncode != 0:
             raise click.ClickException("Failed to introspect MCP server")
     except subprocess.TimeoutExpired:
@@ -736,48 +749,50 @@ async def _introspect_mcp_async(
 ):
     """Async implementation of MCP introspection."""
     from fastmcp import Client
-    
+
     mcp_config = None
     spec_to_use: Union[str, list[str]] = mcp_spec
-    
+
     # If registry is specified, load the MCP config
     if registry:
         click.echo(f"📚 Loading MCP '{mcp_spec}' from registry: {registry}")
         registry_config = load_mcp_registry(registry)
-        
+
         # Find the MCP in the registry
         mcp_config = None
         for mcp in registry_config.servers:
             if mcp.name == mcp_spec:
                 mcp_config = mcp
                 break
-        
+
         if not mcp_config:
             available = [mcp.name for mcp in registry_config.servers]
             raise click.ClickException(
                 f"MCP '{mcp_spec}' not found in registry. Available: {', '.join(available)}"
             )
-        
+
         # Build the command from MCP config
         if mcp_config.command and mcp_config.args:
             spec_to_use = [mcp_config.command] + mcp_config.args
         else:
-            raise click.ClickException(f"MCP '{mcp_spec}' has incomplete command configuration")
-    
+            raise click.ClickException(
+                f"MCP '{mcp_spec}' has incomplete command configuration"
+            )
+
     click.echo(f"🔍 Introspecting MCP: {spec_to_use}")
-    
+
     # Create client based on the spec type
     if isinstance(spec_to_use, list):
         # Command-based MCP - FastMCP expects a single server config dict
         server_config = {
             "server_name": {
                 "command": spec_to_use[0],
-                "args": spec_to_use[1:] if len(spec_to_use) > 1 else []
+                "args": spec_to_use[1:] if len(spec_to_use) > 1 else [],
             }
         }
         if mcp_config and mcp_config.env:
             server_config["server_name"]["env"] = mcp_config.env  # type: ignore
-        
+
         # FastMCP expects the full config with mcpServers key
         full_config = {"mcpServers": server_config}
         client = Client(full_config)
@@ -787,28 +802,29 @@ async def _introspect_mcp_async(
     else:
         # Try as command
         import shlex
+
         parts = shlex.split(spec_to_use)
         server_config = {
             "server_name": {
                 "command": parts[0],
-                "args": parts[1:] if len(parts) > 1 else []
+                "args": parts[1:] if len(parts) > 1 else [],
             }
         }
         full_config = {"mcpServers": server_config}
         client = Client(full_config)
-    
+
     async with client:
         click.echo("✅ Connected to MCP server")
-        
+
         # Get server info if available
-        if hasattr(client, 'server_info'):
+        if hasattr(client, "server_info"):
             info = client.server_info
             click.echo("\n📋 Server Info:")
             click.echo(f"   Name: {info.name}")
             click.echo(f"   Version: {info.version}")
-            if hasattr(info, 'description') and info.description:
+            if hasattr(info, "description") and info.description:
                 click.echo(f"   Description: {info.description}")
-        
+
         # List tools
         click.echo("\n🔧 Available Tools:")
         try:
@@ -818,13 +834,15 @@ async def _introspect_mcp_async(
                     click.echo(f"\n   📌 {tool.name}")
                     if tool.description:
                         click.echo(f"      Description: {tool.description}")
-                    if verbose and hasattr(tool, 'inputSchema') and tool.inputSchema:
-                        click.echo(f"      Input Schema: {yaml.dump(tool.inputSchema, default_flow_style=False, indent=8).strip()}")
+                    if verbose and hasattr(tool, "inputSchema") and tool.inputSchema:
+                        click.echo(
+                            f"      Input Schema: {yaml.dump(tool.inputSchema, default_flow_style=False, indent=8).strip()}"
+                        )
             else:
                 click.echo("   (No tools available)")
         except Exception as e:
             click.echo(f"   ⚠️ Error listing tools: {e}")
-        
+
         # List resources
         click.echo("\n📁 Available Resources:")
         try:
@@ -841,7 +859,7 @@ async def _introspect_mcp_async(
                 click.echo("   (No resources available)")
         except Exception as e:
             click.echo(f"   ⚠️ Error listing resources: {e}")
-        
+
         # List prompts
         click.echo("\n💬 Available Prompts:")
         try:
@@ -851,16 +869,18 @@ async def _introspect_mcp_async(
                     click.echo(f"\n   💡 {prompt.name}")
                     if prompt.description:
                         click.echo(f"      Description: {prompt.description}")
-                    if verbose and hasattr(prompt, 'arguments') and prompt.arguments:
+                    if verbose and hasattr(prompt, "arguments") and prompt.arguments:
                         click.echo("      Arguments:")
                         for arg in prompt.arguments:
                             req = "required" if arg.required else "optional"
-                            click.echo(f"        - {arg.name} ({req}): {arg.description}")
+                            click.echo(
+                                f"        - {arg.name} ({req}): {arg.description}"
+                            )
             else:
                 click.echo("   (No prompts available)")
         except Exception as e:
             click.echo(f"   ⚠️ Error listing prompts: {e}")
-        
+
         click.echo("\n✅ Introspection complete!")
 
 

@@ -62,17 +62,17 @@ def test_llm_coder_basic_arithmetic(coder_name, coder_class):
 
             # Check result
             assert result is not None
-            assert (
-                result.stdout or result.result_text
-            ), "Coder should produce some output"
+            assert result.stdout or result.result_text, (
+                "Coder should produce some output"
+            )
 
             # Get the actual output text
             output_text = result.result_text or result.stdout
 
             # All LLM coders should include "4" in their answer
-            assert (
-                "4" in output_text
-            ), f"{coder_name} should answer '4' to 'What is 2+2?'"
+            assert "4" in output_text, (
+                f"{coder_name} should answer '4' to 'What is 2+2?'"
+            )
 
         except Exception as e:
             pytest.fail(f"Coder {coder_name} failed with error: {e}")
@@ -137,12 +137,12 @@ def test_llm_coder_code_generation(coder_name, coder_class):
             assert output_text, "Coder should produce some output"
 
             # Verify the output contains Python code elements
-            assert (
-                "def" in output_text
-            ), f"{coder_name} should generate a Python function"
-            assert (
-                "return" in output_text or "print" in output_text
-            ), f"{coder_name} should have return or print"
+            assert "def" in output_text, (
+                f"{coder_name} should generate a Python function"
+            )
+            assert "return" in output_text or "print" in output_text, (
+                f"{coder_name} should have return or print"
+            )
 
         except Exception as e:
             pytest.fail(f"Coder {coder_name} failed with error: {e}")
