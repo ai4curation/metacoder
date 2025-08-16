@@ -8,6 +8,7 @@ from metacoder.coders.claude import ClaudeCoder
 from metacoder.coders.codex import CodexCoder
 from metacoder.coders.dummy import DummyCoder
 from metacoder.coders.gemini import GeminiCoder
+from metacoder.coders.opencode import OpencodeCoder
 from metacoder.coders.qwen import QwenCoder
 
 
@@ -16,6 +17,7 @@ AVAILABLE_CODERS: Dict[str, Type[BaseCoder]] = {
     "claude": ClaudeCoder,
     "codex": CodexCoder,
     "gemini": GeminiCoder,
+    "opencode": OpencodeCoder,
     "qwen": QwenCoder,
     "dummy": DummyCoder,
 }
