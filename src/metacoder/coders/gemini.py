@@ -32,7 +32,7 @@ class GeminiCoder(BaseCoder):
     - `.gemini/commands/` - Custom commands directory
 
     MCP Support:
-    
+
     Gemini CLI supports MCP (Model Context Protocol) servers through the
     mcpServers configuration in .gemini/settings.json. When MCPs are configured
     through Metacoder, they will be automatically added to the settings file.
@@ -86,29 +86,27 @@ class GeminiCoder(BaseCoder):
 
         # For HTTP type MCPs
         elif mcp.type == MCPType.HTTP:
-            raise NotImplementedError(
-                "HTTP MCPs are not supported for Gemini CLI yet"
-            )
+            raise NotImplementedError("HTTP MCPs are not supported for Gemini CLI yet")
 
         return server_config
 
     def default_config_objects(self) -> list[CoderConfigObject]:
         """Generate config objects including MCP configuration."""
         config_objects = []
-        
+
         # Create .gemini/settings.json if we have MCP extensions
         settings_content: dict[str, Any] = {}
-        
+
         # Add MCP servers configuration if extensions are present
         if self.config and self.config.extensions:
             mcp_servers = {}
             for mcp in self.config.extensions:
                 if mcp.enabled:
                     mcp_servers[mcp.name] = self.mcp_config_to_gemini_format(mcp)
-            
+
             if mcp_servers:
                 settings_content["mcpServers"] = mcp_servers
-        
+
         # Add settings.json if we have content to write
         if settings_content:
             config_objects.append(
@@ -118,10 +116,10 @@ class GeminiCoder(BaseCoder):
                     content=settings_content,
                 )
             )
-        
+
         # Add GEMINI.md if present in config
         # This could contain instructions specific to the task
-        
+
         return config_objects
 
     def run(self, input_text: str) -> CoderOutput:
@@ -136,7 +134,7 @@ class GeminiCoder(BaseCoder):
             env["HOME"] = "."
 
             text = self.expand_prompt(input_text)
-            
+
             # Build the command
             # The gemini CLI uses conversational interface, so we need to handle it differently
             # For now, we'll use echo to pipe the prompt

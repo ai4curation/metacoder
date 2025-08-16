@@ -54,7 +54,10 @@ class AIModelProvider(BaseModel):
     name: str = Field(..., description="Name of the model provider")
     api_key: str | None = Field(None, description="API key for the model provider")
     metadata: dict[str, Any] = Field({}, description="Metadata for the model provider")
-    base_url: str | None = Field(None, description="Base URL for the model provider")
+    base_url: str | None = Field(
+        None,
+        description="Base URL for the model provider, e.g. https://api.cborg.lbl.gov ",
+    )
 
 
 class AIModelConfig(BaseModel):

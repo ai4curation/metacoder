@@ -21,10 +21,15 @@ logger = logging.getLogger(__name__)
 
 class ToolUse(BaseModel):
     """Tool use from the coder."""
-    name: str = Field(..., description="Name of the tool; e.g. mcp.pubmed.get_paper_fulltext")
+
+    name: str = Field(
+        ..., description="Name of the tool; e.g. mcp.pubmed.get_paper_fulltext"
+    )
     arguments: dict[str, Any] = Field(..., description="Arguments to the tool")
     success: bool = Field(..., description="Whether the tool call was successful")
-    error: str | None = Field(default=None, description="Error message if the tool call failed")
+    error: str | None = Field(
+        default=None, description="Error message if the tool call failed"
+    )
     result: Any = Field(..., description="Result of the tool")
 
 
@@ -87,6 +92,7 @@ class BaseCoder(BaseModel, ABC):
     Subclasses should implement the following methods:
     - run(self, input_text: str) -> CoderOutput: Run the coder on the input text
     """
+
     workdir: str = Field(default="workdir", description="Working dir ")
     config: CoderConfig | None = Field(default=None, description="Config for the coder")
     params: dict | None = Field(default=None, description="Parameters for the coder")
@@ -115,8 +121,6 @@ class BaseCoder(BaseModel, ABC):
                 )
         return self
 
-
-
     @abstractmethod
     def run(self, input_text: str) -> CoderOutput:
         """Run the coder on the input text.
@@ -128,7 +132,6 @@ class BaseCoder(BaseModel, ABC):
             CoderOutput: The output of the coder
         """
         raise NotImplementedError
-
 
     @classmethod
     def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
@@ -220,7 +223,6 @@ class BaseCoder(BaseModel, ABC):
 
         return CoderOutput(stdout=stdout_text, stderr=stderr_text)
 
-
     def expand_env(self, env: dict[str, str] | None = None) -> dict[str, str]:
         """
         Expand environment variables in the coder config.
@@ -257,7 +259,7 @@ class BaseCoder(BaseModel, ABC):
 
     def expand_prompt(self, input_text: str) -> str:
         """Expand environment variables in the prompt.
-        
+
         Typically this just returns the prompt as is:
 
         Example:
@@ -278,7 +280,7 @@ class BaseCoder(BaseModel, ABC):
     def default_config_objects(self) -> list[CoderConfigObject]:
         """Default config objects for the coder."""
         raise NotImplementedError("default_config_objects is not implemented")
-    
+
     def set_instructions(self, instructions: str):
         """Set the instructions for the coder.
 
@@ -291,7 +293,7 @@ class BaseCoder(BaseModel, ABC):
             >>> coder.set_instructions("you are an awesome coder")
             >>> coder.config_objects
             [CoderConfigObject(file_type=<FileType.TEXT: 'text'>, relative_path='CLAUDE.md', content='you are an awesome coder')]
-        
+
         Args:
             instructions: The instructions to set
         """
@@ -300,16 +302,25 @@ class BaseCoder(BaseModel, ABC):
                 if not self.config_objects:
                     self.config_objects = []
                 for obj in self.config_objects:
-                    if obj.relative_path == str(path) or obj.relative_path == str(path.name):
+                    if obj.relative_path == str(path) or obj.relative_path == str(
+                        path.name
+                    ):
                         obj.content = instructions
                         return
                 else:
-                    self.config_objects.append(CoderConfigObject(relative_path=str(path), content=instructions, file_type=FileType.TEXT))
+                    self.config_objects.append(
+                        CoderConfigObject(
+                            relative_path=str(path),
+                            content=instructions,
+                            file_type=FileType.TEXT,
+                        )
+                    )
                     return
             else:
                 raise ValueError(f"Cannot set instructions for {typ}")
-        raise ValueError(f"No primary instruction file found for {self.__class__.__name__}")
-            
+        raise ValueError(
+            f"No primary instruction file found for {self.__class__.__name__}"
+        )
 
     def prepare_workdir(self):
         """Prepare the workdir for the coder.
@@ -330,11 +341,7 @@ class BaseCoder(BaseModel, ABC):
         # Check if MCP extensions are configured but not supported
         if self.config and self.config.extensions:
             logger.debug(f"🔧 Checking MCP extensions: {self.config.extensions}")
-            mcp_extensions = [
-                ext
-                for ext in self.config.extensions
-                if ext.enabled
-            ]
+            mcp_extensions = [ext for ext in self.config.extensions if ext.enabled]
             if mcp_extensions and not self.supports_mcp():
                 raise ValueError(
                     f"MCP extensions are configured but {self.__class__.__name__} does not support MCP. "
@@ -353,6 +360,7 @@ class BaseCoder(BaseModel, ABC):
                     logger.debug(f" 🗑️ Removing old config object: {path}")
                     if path.is_dir():
                         import shutil
+
                         shutil.rmtree(path)
                     else:
                         path.unlink()

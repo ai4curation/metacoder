@@ -26,7 +26,6 @@ class CodexCoder(BaseCoder):
         """Check if codex command is available."""
         return shutil.which("codex") is not None
 
-
     @property
     def instructions_path(self) -> Path:
         return Path("AGENTS.md")
