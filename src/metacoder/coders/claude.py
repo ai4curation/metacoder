@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 import logging
 import shutil
+import subprocess
 from typing import Any
 
 from metacoder.coders.base_coder import (
@@ -146,7 +147,17 @@ class ClaudeCoder(BaseCoder):
             logger.info(f"🤖 Running command: {' '.join(command)}")
             # time the command
             start_time = time.time()
-            ao = self.run_process(command, env)
+            
+            # Catch CalledProcessError to handle Claude CLI non-zero exit codes
+            # Claude CLI can return non-zero exit codes even for successful operations
+            try:
+                ao = self.run_process(command, env)
+            except subprocess.CalledProcessError as e:
+                # Extract stdout and stderr from the exception
+                stdout_text = e.stdout if e.stdout else ""
+                stderr_text = e.stderr if e.stderr else ""
+                # Create CoderOutput manually so we can process the JSON output
+                ao = CoderOutput(stdout=stdout_text, stderr=stderr_text)
 
             # parse the jsonl output
             def parse_jsonl_line(text: str) -> dict[str, Any]:
