@@ -250,5 +250,11 @@ class ClaudeCoder(BaseCoder):
             ao.total_cost_usd = total_cost_usd
             ao.success = not is_error
             if not ao.success:
+                # Check for authentication issues and provide helpful error message
+                if "Invalid API key" in ao.result_text or "Please run /login" in ao.result_text:
+                    raise ValueError(
+                        f"Claude authentication failed. Try setting ANTHROPIC_AUTH_TOKEN environment variable or run 'claude setup-token'. "
+                        f"For custom endpoints, also set ANTHROPIC_BASE_URL. Original error: {ao.stderr} // {ao}"
+                    )
                 raise ValueError(f"Claude failed with error: {ao.stderr} // {ao}")
             return ao
