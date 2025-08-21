@@ -147,7 +147,7 @@ class ClaudeCoder(BaseCoder):
             logger.info(f"🤖 Running command: {' '.join(command)}")
             # time the command
             start_time = time.time()
-            
+
             # Catch CalledProcessError to handle Claude CLI non-zero exit codes
             # Claude CLI can return non-zero exit codes even for successful operations
             try:
@@ -251,7 +251,11 @@ class ClaudeCoder(BaseCoder):
             ao.success = not is_error
             if not ao.success:
                 # Check for authentication issues and provide helpful error message
-                if "Invalid API key" in ao.result_text or "Please run /login" in ao.result_text:
+                result_text = ao.result_text or ""
+                if (
+                    "Invalid API key" in result_text
+                    or "Please run /login" in result_text
+                ):
                     raise ValueError(
                         f"Claude authentication failed. Try setting ANTHROPIC_AUTH_TOKEN environment variable or run 'claude setup-token'. "
                         f"For custom endpoints, also set ANTHROPIC_BASE_URL. Original error: {ao.stderr} // {ao}"
