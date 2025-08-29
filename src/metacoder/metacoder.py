@@ -421,9 +421,7 @@ def run(
                 coder_config.ai_model.name = model
 
         # Show the model configuration
-        click.echo(
-            f"🧠 AI Model: {coder_config.ai_model.name} (provider: {coder_config.ai_model.provider})"
-        )
+        click.echo(f"🧠 AI Model: {coder_config.ai_model.name} (provider: {coder_config.ai_model.provider})")
 
     if coder_config and coder_config.extensions:
         for mcp in coder_config.extensions:
@@ -481,16 +479,12 @@ def run(
         click.echo("\n📋 Tool uses:")
         for tool_use in result.tool_uses:
             success = "✅" if tool_use.success else "❌"
-            click.echo(
-                f"  {success} {tool_use.name} with arguments: {tool_use.arguments}"
-            )
+            click.echo(f"  {success} {tool_use.name} with arguments: {tool_use.arguments}")
             if tool_use.error:
                 click.echo(f"    Error: {tool_use.error}")
 
     if verbose and result.structured_messages:
-        click.echo(
-            f"\n📋 Structured messages ({len(result.structured_messages)} total)"
-        )
+        click.echo(f"\n📋 Structured messages ({len(result.structured_messages)} total)")
         for i, msg in enumerate(result.structured_messages):
             click.echo(f"  {i + 1}. {msg}")
 
@@ -592,38 +586,28 @@ def eval_command(config: str, output: str, workdir: str, coders: tuple, verbose:
 
     # Print summary
     summary = runner.generate_summary(results)
+    frac_passed = summary['passed'] / summary['total_evaluations'] if summary['total_evaluations'] else 0
+    frac_failed = summary['failed'] / summary['total_evaluations'] if summary['total_evaluations'] else 0
+
     click.echo("\n📈 Summary:")
     click.echo(f"   Total: {summary['total_evaluations']}")
-    click.echo(
-        f"   Passed: {summary['passed']} ({summary['passed'] / summary['total_evaluations'] * 100:.1f}%)"
-    )
-    click.echo(
-        f"   Failed: {summary['failed']} ({summary['failed'] / summary['total_evaluations'] * 100:.1f}%)"
-    )
-    if summary["errors"] > 0:
-        click.echo(f"   Errors: {summary['errors']} ⚠️")
+    click.echo(f"   Passed: {summary['passed']} ({frac_passed:.1%})")
+    click.echo(f"   Failed: {summary['failed']} ({frac_failed:.1%})")
+    click.echo(f"   Errors: {summary['errors']} ⚠️") if summary["errors"] else None
 
     # Print by-coder summary
     if len(summary["by_coder"]) > 1:
         click.echo("\n   By Coder:")
         for coder, stats in summary["by_coder"].items():
-            pass_rate = (
-                stats["passed"] / stats["total"] * 100 if stats["total"] > 0 else 0
-            )
-            click.echo(
-                f"     {coder}: {stats['passed']}/{stats['total']} ({pass_rate:.1f}%)"
-            )
+            coder_frac_passed = stats['passed'] / stats['total'] if stats['total'] else 0
+            click.echo(f"     {coder}: {stats['passed']} / {stats['total']} ({coder_frac_passed:.1%})")
 
     # Print by-model summary
     if len(summary["by_model"]) > 1:
         click.echo("\n   By Model:")
         for model, stats in summary["by_model"].items():
-            pass_rate = (
-                stats["passed"] / stats["total"] * 100 if stats["total"] > 0 else 0
-            )
-            click.echo(
-                f"     {model}: {stats['passed']}/{stats['total']} ({pass_rate:.1f}%)"
-            )
+            model_frac_passed = stats['passed'] / stats['total'] if stats['total'] else 0
+            click.echo(f"     {model}: {stats['passed']} / {stats['total']} ({model_frac_passed:.1%})")
 
     click.echo("\n✅ Evaluation complete!")
 
