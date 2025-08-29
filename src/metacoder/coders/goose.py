@@ -165,7 +165,7 @@ class GooseCoder(BaseCoder):
                     session_file = Path(session_file_str)
                     break
             if session_file and session_file.exists():
-                with open(session_file, "r") as f:
+                with open(session_file, "r", encoding="utf-8") as f:
                     ao.structured_messages = [
                         json.loads(line) for line in f if line.strip()
                     ]
