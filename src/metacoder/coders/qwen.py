@@ -90,7 +90,7 @@ class QwenCoder(BaseCoder):
                 )
 
             end_time = time.time()
-            print(f"🤖 Command took {end_time - start_time} seconds")
+            print(f"🤖 Command took {end_time - start_time:.2f} seconds")
 
             # Create output - Qwen CLI doesn't provide structured output
             ao = CoderOutput(

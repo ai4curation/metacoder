@@ -156,7 +156,7 @@ class GooseCoder(BaseCoder):
             result = self.run_process(command, env)
             end_time = time.time()
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)
-            logger.info(f"🦆 Command took {end_time - start_time} seconds")
+            logger.info(f"🦆 Command took {end_time - start_time:.2f} seconds")
             # look in output text for a file like: logging to ./.local/share/goose/sessions/20250613_120403.jsonl
             session_file: Optional[Path] = None
             for line in result.stdout.split("\n"):
