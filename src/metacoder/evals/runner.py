@@ -202,7 +202,7 @@ class EvalRunner:
     @functools.lru_cache(maxsize=1)
     def _openai_quota_ok(self, model: str = "gpt-4o-mini") -> bool:
         if not os.getenv("OPENAI_API_KEY"):
-            logger.warning("OPENAI_API_KEY is not set.")
+            logger.info("OPENAI_API_KEY is not set.")
             return False
         """
             Preflight: detect “no OpenAI quota” and skip/redirect before calling evaluate.
@@ -227,13 +227,13 @@ class EvalRunner:
         except APIStatusError as e:
             # 429 insufficient_quota, or other status codes
             if e.status_code == 429:
-                logger.warning(f"OpenAI API Key has insufficient quota: {e}")
+                logger.info(f"OpenAI API Key has insufficient quota: {e}")
                 return False
-            logger.warning(f"OpenAI API Status Error; treating as no-quota: {e}")
+            logger.info(f"OpenAI API Status Error; treating as no-quota: {e}")
             return False
         except Exception as e:
             # includes 401 (bad key), 429 (insufficient_quota), network issues, etc.
-            logger.warning(f"OpenAI preflight failed; treating as no-quota: {e}")
+            logger.info(f"OpenAI preflight failed; treating as no-quota: {e}")
             return False
 
     def run_single_eval(
@@ -294,13 +294,14 @@ class EvalRunner:
                 # Assume GEval will hit OpenAI unless we replace it.
                 if self.use_openai and not self._openai_quota_ok():
                     self.use_openai = False
-                    logger.warning("OpenAI quota exhausted; downgrading to Claude...")
+                    claude_model = "claude-3-5-sonnet-20240620"
+                    logger.warning(f"OpenAI API quota exhausted or server unavailable; downgrading to {claude_model}")
                     from metacoder.evals.judges import ClaudeJudge
 
                     try:
                         # Downgrade to Claude judge in order to keep a real metric (even if not directly comparable to OpenAI).
                         metric = make_geval(
-                            model=ClaudeJudge("claude-3-5-sonnet-20240620")
+                            model=ClaudeJudge(claude_model)
                         )
                     except Exception as e:
                         # Fallback: if you can't use Claude, downgrade gracefully.
