@@ -29,20 +29,27 @@ def test_claude_judge_downgrade_success(tmp_path, caplog, monkeypatch):
                 dataset, workdir=tmp_path, coders=["goose", "dummy"]
             )
 
-            # Verfiy that the downgrade happened.
+            # Test that the quota exhaustion fallback logic worked as expected.
             assert (
                 "OpenAI API quota exhausted or server unavailable; disabling OpenAI for DeepEval."
                 in caplog.text
             )
 
-            # Verify that the eval completed by checking for a non-zero score.
+            # Test that the new evaluation judge was correctly selected for the metric model downgrade.
+            assert (
+                "Downgrading CorrectnessMetric model from gpt-4.1 to claude-3-5-sonnet-20240620."
+                in caplog.text
+            )
+
+            # Test that the eval completed by checking for a non-zero score.
             assert results[0].score > 0, (
-                f"Expected ClaudeJudge to score {results[0].metric_name} for {results[0].case_name}"
+                f"Expected a {results[0].metric_name} score for {results[0].case_name}."
             )
 
     except Exception as e:
+        # Test that fallback logic does not result in an Exception.
         logger.error(f"An error occurred: {e}")
         logging.error(traceback.format_exc())
-        assert False  # force test to fail if an exception is caught here
+        assert False  # This assertion will fail if an Exception is caught here.
     finally:
         pass
