@@ -10,6 +10,7 @@ import importlib
 import logging
 import os
 import time
+import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type, cast
 
@@ -225,15 +226,20 @@ class EvalRunner:
             )
             return True
         except APIStatusError as e:
-            # 429 insufficient_quota, or other status codes
+            # 429 insufficient quota or too many requests
             if e.status_code == 429:
-                logger.info(f"OpenAI API Key has insufficient quota: {e}")
+                logger.warning(f"OpenAI API Key has insufficient quota: {e}")
                 return False
-            logger.info(f"OpenAI API Status Error; treating as no-quota: {e}")
+            # 401 authentication problem, including invalid API key
+            if e.status_code == 401:
+                logger.warning(f"OpenAI API Authentication Error: {e}")
+                return False
+            # all other errors
+            logger.warning(f"OpenAI API Status Error; treating as no-quota: {e}")
             return False
         except Exception as e:
-            # includes 401 (bad key), 429 (insufficient_quota), network issues, etc.
-            logger.info(f"OpenAI preflight failed; treating as no-quota: {e}")
+            # includes network issues, etc.
+            logger.warning(f"OpenAI preflight failed; treating as no-quota: {e}")
             return False
 
     def run_single_eval(
@@ -288,27 +294,47 @@ class EvalRunner:
             test_case = self.create_test_case(case, actual_output)
 
             # Evaluate
-            logger.info(f"Evaluating with {metric_name}")
+            logger.info(
+                f"Evaluating {metric_name} using model {metric.model.model_name}"
+            )
 
             if isinstance(metric, GEval):
-                # Assume GEval will hit OpenAI unless we replace it.
+                # Assume GEval will use OpenAI until is disabled.
                 if self.use_openai and not self._openai_quota_ok():
-                    self.use_openai = False
-                    claude_model = "claude-3-5-sonnet-20240620"
                     logger.warning(
-                        f"OpenAI API quota exhausted or server unavailable; downgrading to {claude_model}"
+                        f"OpenAI API quota exhausted or server unavailable; disabling OpenAI for DeepEval."
                     )
+                    self.use_openai = False
+
+                # Note: This will downgrade a metric if needed each time it is about to be used without modifying the default metrics.
+                if not self.use_openai:
                     from metacoder.evals.judges import ClaudeJudge
 
+                    claude_model = "claude-3-5-sonnet-20240620"
+                    logger.warning(
+                        f"Downgrading {metric_name} model from {metric.model.model_name} to {claude_model}."
+                    )
+
                     try:
-                        # Downgrade to Claude judge in order to keep a real metric (even if not directly comparable to OpenAI).
+                        # Downgrade metric model to Claude judge.
                         metric = make_geval(model=ClaudeJudge(claude_model))
+                        logger.warning(
+                            f"Successfully downgraded {metric_name} model to {metric.model.model_name}."
+                        )
                     except Exception as e:
                         # Fallback: if you can't use Claude, downgrade gracefully.
+                        logging.error(traceback.format_exc())
                         logger.warning(
                             "Claude unavailable (%s); downgrading to DummyMetric.", e
                         )
                         metric = DummyMetric(threshold=0.5)
+                        logger.warning(
+                            f"Successfully downgraded {metric_name} model to {metric.model.model_name}."
+                        )
+
+            logger.warning(
+                f"Actual {metric_name} model used: {metric.model.model_name}"
+            )
 
             eval_results = evaluate(
                 [test_case],
