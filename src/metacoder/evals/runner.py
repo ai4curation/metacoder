@@ -5,29 +5,32 @@ Runs evaluations across all combinations of model x coder x case x metric.
 """
 
 import copy
+import functools
 import importlib
 import logging
+import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, cast
 
 from pydantic import BaseModel
 import yaml
-from deepeval import evaluate
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
-from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCaseParams
 
+from deepeval import evaluate
+from deepeval.evaluate import AsyncConfig, DisplayConfig, CacheConfig, ErrorConfig
+from deepeval.models import DeepEvalBaseLLM
+from deepeval.metrics import BaseMetric, GEval
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+
+from openai import APIStatusError
+from openai.types.chat import ChatCompletionMessageParam
 
 from metacoder.coders.base_coder import BaseCoder, CoderOutput
 from metacoder.registry import AVAILABLE_CODERS
 from metacoder.evals.eval_model import EvalCase, EvalDataset
 from metacoder.configuration import AIModelConfig, CoderConfig
 
-
 logger = logging.getLogger(__name__)
-
 
 class DummyMetric(BaseMetric):
     """A dummy metric that always returns a perfect score for testing."""
@@ -58,27 +61,32 @@ class DummyMetric(BaseMetric):
         """Check if the metric passed."""
         return self.success
 
+def make_geval(model: Optional[DeepEvalBaseLLM] = None) -> GEval:
+    """Creates a GEval instance with the specified model."""
+    return GEval(
+        name="Correctness",
+        criteria="Determine whether the actual output is factually correct based on the expected output.",
+        # NOTE: you can only provide either criteria or evaluation_steps, and not both
+        evaluation_steps = [
+            "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
+            "You should also heavily penalize omission of detail",
+            "Vague language, or contradicting OPINIONS, are OK",
+        ],
+        threshold = 0.8,
+        evaluation_params = [
+            LLMTestCaseParams.INPUT,
+            LLMTestCaseParams.ACTUAL_OUTPUT,
+            LLMTestCaseParams.EXPECTED_OUTPUT,
+        ],
+        model = model # may be None (defaults to OpenAI) or a Claude judge
+    )
 
-def get_default_metrics() -> Dict[str, BaseMetric]:
-    """Get default metrics. Creates instances lazily to avoid network calls during import."""
+
+def get_default_metrics(model: Optional[DeepEvalBaseLLM] = None) -> Dict[str, BaseMetric]:
+    """Get default metrics with the specified model. Creates instances lazily to avoid network calls during import."""
     return {
-        "CorrectnessMetric": GEval(
-            name="Correctness",
-            criteria="Determine whether the actual output is factually correct based on the expected output.",
-            # NOTE: you can only provide either criteria or evaluation_steps, and not both
-            evaluation_steps=[
-                "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
-                "You should also heavily penalize omission of detail",
-                "Vague language, or contradicting OPINIONS, are OK",
-            ],
-            threshold=0.8,
-            evaluation_params=[
-                LLMTestCaseParams.INPUT,
-                LLMTestCaseParams.ACTUAL_OUTPUT,
-                LLMTestCaseParams.EXPECTED_OUTPUT,
-            ],
-        ),
-        "DummyMetric": DummyMetric(threshold=0.5),
+        "CorrectnessMetric": make_geval(model = model), # Note: GEval defaults to OpenAI if no model is specified.
+        "DummyMetric": DummyMetric(threshold = 0.5)
     }
 
 
@@ -123,6 +131,8 @@ class EvalRunner:
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
+        self.use_openai = True # GEval will default to OpenAI, avoid it and downgrade to another provider or metric if quota runs out.
+
         if verbose:
             logging.basicConfig(level=logging.DEBUG)
         else:
@@ -183,6 +193,40 @@ class EvalRunner:
             additional_metadata=case.additional_metadata,
         )
 
+    @functools.lru_cache(maxsize=1)
+    def _openai_quota_ok(self, model: str = "gpt-4o-mini") -> bool:
+        if not os.getenv("OPENAI_API_KEY"):
+            logger.warning("OPENAI_API_KEY is not set.")
+            return False
+        """
+            Preflight: detect “no OpenAI quota” and skip/redirect before calling evaluate.
+            Fast probe of the /chat/completions endpoint (the one GEval uses).
+            Returns False on 429 (insufficient_quota) or any exception.
+        """
+        try:
+            from openai import OpenAI
+            # turn off SDK retries for the check so it returns fast
+            client = OpenAI(max_retries=0, timeout=8)  # NO retries, quick fail
+            # messages = cast(List[ChatCompletionMessageParam], [{"role": "user", "content": "ping"}])
+            raw = [{"role": "user", "content": "ping"}]
+            messages = cast(List[ChatCompletionMessageParam], raw)
+            client.chat.completions.create(
+                model = model,
+                messages = messages,
+                max_tokens = 1,
+                temperature = 0,
+            )
+            return True
+        except APIStatusError as e:
+            # 429 insufficient_quota, or other status codes
+            if e.status_code == 429:
+                return False
+            return False
+        except Exception as e:
+            # includes 401 (bad key), 429 (insufficient_quota), network issues, etc.
+            logger.warning(f"OpenAI preflight failed; treating as no-quota: {e}")
+            return False
+
     def run_single_eval(
         self,
         model_name: str,
@@ -236,7 +280,29 @@ class EvalRunner:
 
             # Evaluate
             logger.info(f"Evaluating with {metric_name}")
-            eval_results = evaluate([test_case], [metric])
+
+            if isinstance(metric, GEval):
+                # Assume GEval will hit OpenAI unless we replace it.
+                if self.use_openai and not self._openai_quota_ok():
+                    self.use_openai = False
+                    logger.warning("OpenAI quota exhausted; downgrading to Claude...")
+                    from metacoder.evals.judges import ClaudeJudge
+                    try:
+                        # Downgrade to Claude judge in order to keep a real metric (even if not directly comparable to OpenAI).
+                        metric = make_geval(model = ClaudeJudge("claude-3-5-sonnet-20240620"))
+                    except Exception as e:
+                        # Fallback: if you can't use Claude, downgrade gracefully.
+                        logger.warning("Claude unavailable (%s); downgrading to DummyMetric.", e)
+                        metric = DummyMetric(threshold = 0.5)
+
+            eval_results = evaluate(
+                [test_case],
+                [metric],
+                async_config = AsyncConfig(run_async=False), # disable async
+                display_config = DisplayConfig(show_indicator=False, print_results=False, verbose_mode=self.verbose), # hide the spinner
+                cache_config = CacheConfig(use_cache=False, write_cache=False),
+                error_config = ErrorConfig(ignore_errors=False, skip_on_missing_params=True) # actually fail on failure
+            )
 
             # Extract results - the structure varies by deepeval version
             test_result = eval_results.test_results[0]
