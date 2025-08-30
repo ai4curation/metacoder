@@ -1,0 +1,30 @@
+name: pubmed tools evals
+description: |
+  Evaluations for multiple pubmed MCPs
+
+coders:
+  goose: {}
+
+models:
+  claude-sonnet:
+    provider: anthropic
+    name: claude-sonnet-4-20250514
+
+servers:
+  mcp-simple-pubmed:
+    name: pubmed
+    command: uvx
+    args: [mcp-simple-pubmed]
+    env:
+      PUBMED_EMAIL: ctparker@lbl.gov
+
+#server_combinations:
+#  - [mcp-simple-pubmed]
+
+cases:
+- name: PMID_28027860_Full_Text
+  metrics: [CorrectnessMetric]
+  input: "What is the first sentence of section 2 in PMID: 28027860?"
+  expected_output: |
+    Even though many of NFLE's core features have been clarified in the last two decades, some critical issues remain controversial."
+  threshold: 0.9
