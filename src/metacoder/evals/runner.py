@@ -295,14 +295,14 @@ class EvalRunner:
                 if self.use_openai and not self._openai_quota_ok():
                     self.use_openai = False
                     claude_model = "claude-3-5-sonnet-20240620"
-                    logger.warning(f"OpenAI API quota exhausted or server unavailable; downgrading to {claude_model}")
+                    logger.warning(
+                        f"OpenAI API quota exhausted or server unavailable; downgrading to {claude_model}"
+                    )
                     from metacoder.evals.judges import ClaudeJudge
 
                     try:
                         # Downgrade to Claude judge in order to keep a real metric (even if not directly comparable to OpenAI).
-                        metric = make_geval(
-                            model=ClaudeJudge(claude_model)
-                        )
+                        metric = make_geval(model=ClaudeJudge(claude_model))
                     except Exception as e:
                         # Fallback: if you can't use Claude, downgrade gracefully.
                         logger.warning(
