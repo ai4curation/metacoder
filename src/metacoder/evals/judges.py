@@ -4,7 +4,9 @@ import os
 
 from anthropic import Anthropic
 from anthropic.types import MessageParam, TextBlockParam, TextBlock
+
 from deepeval.models.base_model import DeepEvalBaseLLM
+
 
 class ClaudeJudge(DeepEvalBaseLLM):
     """
@@ -22,7 +24,7 @@ class ClaudeJudge(DeepEvalBaseLLM):
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set in environment.")
-        self.client = Anthropic(api_key = api_key)
+        self.client = Anthropic(api_key=api_key)
         self.model_name = model_name
         self.max_tokens = max_tokens
         self.temperature = temperature
@@ -35,10 +37,10 @@ class ClaudeJudge(DeepEvalBaseLLM):
         content: list[TextBlockParam] = [{"type": "text", "text": prompt}]
         messages: list[MessageParam] = [{"role": "user", "content": content}]
         resp = self.client.messages.create(
-            model = self.model_name,
-            max_tokens = self.max_tokens,
-            temperature = self.temperature,
-            messages = messages
+            model=self.model_name,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            messages=messages,
         )
         # anthropic returns a list of content blocks; collect only the text blocks.
         parts: list[str] = []

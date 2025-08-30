@@ -32,6 +32,7 @@ from metacoder.configuration import AIModelConfig, CoderConfig
 
 logger = logging.getLogger(__name__)
 
+
 class DummyMetric(BaseMetric):
     """A dummy metric that always returns a perfect score for testing."""
 
@@ -61,32 +62,37 @@ class DummyMetric(BaseMetric):
         """Check if the metric passed."""
         return self.success
 
+
 def make_geval(model: Optional[DeepEvalBaseLLM] = None) -> GEval:
     """Creates a GEval instance with the specified model."""
     return GEval(
         name="Correctness",
         criteria="Determine whether the actual output is factually correct based on the expected output.",
         # NOTE: you can only provide either criteria or evaluation_steps, and not both
-        evaluation_steps = [
+        evaluation_steps=[
             "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
             "You should also heavily penalize omission of detail",
             "Vague language, or contradicting OPINIONS, are OK",
         ],
-        threshold = 0.8,
-        evaluation_params = [
+        threshold=0.8,
+        evaluation_params=[
             LLMTestCaseParams.INPUT,
             LLMTestCaseParams.ACTUAL_OUTPUT,
             LLMTestCaseParams.EXPECTED_OUTPUT,
         ],
-        model = model # may be None (defaults to OpenAI) or a Claude judge
+        model=model,  # may be None (defaults to OpenAI) or a Claude judge
     )
 
 
-def get_default_metrics(model: Optional[DeepEvalBaseLLM] = None) -> Dict[str, BaseMetric]:
+def get_default_metrics(
+    model: Optional[DeepEvalBaseLLM] = None,
+) -> Dict[str, BaseMetric]:
     """Get default metrics with the specified model. Creates instances lazily to avoid network calls during import."""
     return {
-        "CorrectnessMetric": make_geval(model = model), # Note: GEval defaults to OpenAI if no model is specified.
-        "DummyMetric": DummyMetric(threshold = 0.5)
+        "CorrectnessMetric": make_geval(
+            model=model  # Note: GEval defaults to OpenAI if no model is specified.
+        ),
+        "DummyMetric": DummyMetric(threshold=0.5),
     }
 
 
@@ -131,7 +137,7 @@ class EvalRunner:
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self.use_openai = True # GEval will default to OpenAI, avoid it and downgrade to another provider or metric if quota runs out.
+        self.use_openai = True  # GEval will default to OpenAI, avoid it and downgrade to another provider or metric if quota runs out.
 
         if verbose:
             logging.basicConfig(level=logging.DEBUG)
@@ -205,16 +211,17 @@ class EvalRunner:
         """
         try:
             from openai import OpenAI
+
             # turn off SDK retries for the check so it returns fast
             client = OpenAI(max_retries=0, timeout=8)  # NO retries, quick fail
             # messages = cast(List[ChatCompletionMessageParam], [{"role": "user", "content": "ping"}])
             raw = [{"role": "user", "content": "ping"}]
             messages = cast(List[ChatCompletionMessageParam], raw)
             client.chat.completions.create(
-                model = model,
-                messages = messages,
-                max_tokens = 1,
-                temperature = 0,
+                model=model,
+                messages=messages,
+                max_tokens=1,
+                temperature=0,
             )
             return True
         except APIStatusError as e:
@@ -287,21 +294,33 @@ class EvalRunner:
                     self.use_openai = False
                     logger.warning("OpenAI quota exhausted; downgrading to Claude...")
                     from metacoder.evals.judges import ClaudeJudge
+
                     try:
                         # Downgrade to Claude judge in order to keep a real metric (even if not directly comparable to OpenAI).
-                        metric = make_geval(model = ClaudeJudge("claude-3-5-sonnet-20240620"))
+                        metric = make_geval(
+                            model=ClaudeJudge("claude-3-5-sonnet-20240620")
+                        )
                     except Exception as e:
                         # Fallback: if you can't use Claude, downgrade gracefully.
-                        logger.warning("Claude unavailable (%s); downgrading to DummyMetric.", e)
-                        metric = DummyMetric(threshold = 0.5)
+                        logger.warning(
+                            "Claude unavailable (%s); downgrading to DummyMetric.", e
+                        )
+                        metric = DummyMetric(threshold=0.5)
 
             eval_results = evaluate(
                 [test_case],
                 [metric],
-                async_config = AsyncConfig(run_async=False), # disable async
-                display_config = DisplayConfig(show_indicator=False, print_results=False, verbose_mode=self.verbose), # hide the spinner
-                cache_config = CacheConfig(use_cache=False, write_cache=False),
-                error_config = ErrorConfig(ignore_errors=False, skip_on_missing_params=True) # actually fail on failure
+                async_config=AsyncConfig(run_async=False),  # disable async
+                display_config=DisplayConfig(
+                    show_indicator=False,  # hide the progress meter
+                    print_results=False,
+                    verbose_mode=self.verbose,
+                ),
+                cache_config=CacheConfig(use_cache=False, write_cache=False),
+                error_config=ErrorConfig(
+                    ignore_errors=False,  # actually fail on failure
+                    skip_on_missing_params=True,
+                ),
             )
 
             # Extract results - the structure varies by deepeval version
