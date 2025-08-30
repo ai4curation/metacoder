@@ -302,7 +302,7 @@ class EvalRunner:
                 # Assume GEval will use OpenAI until is disabled.
                 if self.use_openai and not self._openai_quota_ok():
                     logger.warning(
-                        f"OpenAI API quota exhausted or server unavailable; disabling OpenAI for DeepEval."
+                        "OpenAI API quota exhausted or server unavailable; disabling OpenAI for DeepEval."
                     )
                     self.use_openai = False
 
@@ -325,16 +325,15 @@ class EvalRunner:
                         # Fallback: if you can't use Claude, downgrade gracefully.
                         logging.error(traceback.format_exc())
                         logger.warning(
-                            "Claude unavailable (%s); downgrading to DummyMetric.", e
+                            "Claude unavailable (%s); downgrading {metric_name} to DummyMetric.",
+                            e,
                         )
                         metric = DummyMetric(threshold=0.5)
                         logger.warning(
-                            f"Successfully downgraded {metric_name} model to {metric.model.model_name}."
+                            f"Successfully downgraded {metric_name} to {metric.name}."
                         )
 
-            logger.warning(
-                f"Actual {metric_name} model used: {metric.model.model_name}"
-            )
+            logger.warning(f"Actual metric used: {metric.name}.")
 
             eval_results = evaluate(
                 [test_case],

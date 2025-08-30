@@ -1,5 +1,4 @@
 import logging
-import os
 import traceback
 from pathlib import Path
 
@@ -10,10 +9,6 @@ logger = logging.getLogger(__name__)
 
 def test_claude_judge_downgrade_success(tmp_path, caplog, monkeypatch):
     """Test that ClaudeJudge is used when OpenAI is disabled."""
-
-    # # Temporarily set an invalid OPENAI_API_KEY in order to force OpenAI calls to fail.
-    # # (no need to reset, `monkeypatch` automatically reverts after the test)
-    # monkeypatch.setenv("OPENAI_API_KEY", "fake-api-key-for-testing")
 
     runner = EvalRunner()
 
@@ -28,19 +23,11 @@ def test_claude_judge_downgrade_success(tmp_path, caplog, monkeypatch):
         with caplog.at_level(logging.WARNING):
             # Temporarily set an invalid OPENAI_API_KEY in order to force OpenAI calls to fail.
             # (no need to reset, `monkeypatch` automatically reverts after the test)
-            # Save the original OPENAI_API_KEY if it exists
-            # original_api_key = os.getenv("OPENAI_API_KEY")
             monkeypatch.setenv("OPENAI_API_KEY", "fake-api-key-for-testing")
 
             results = runner.run_all_evals(
                 dataset, workdir=tmp_path, coders=["goose", "dummy"]
             )
-
-            # # Revert the OPENAI_API_KEY to its original value
-            # if original_api_key is not None:
-            #     monkeypatch.setenv("OPENAI_API_KEY", original_api_key)
-            # else:
-            #     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
             # Verfiy that the downgrade happened.
             assert (
@@ -55,7 +42,6 @@ def test_claude_judge_downgrade_success(tmp_path, caplog, monkeypatch):
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
-        # traceback.print_exc()
         logging.error(traceback.format_exc())
         assert False  # force test to fail if an exception is caught here
     finally:

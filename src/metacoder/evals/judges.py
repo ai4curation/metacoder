@@ -23,7 +23,7 @@ class ClaudeJudge(DeepEvalBaseLLM):
         super().__init__()
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set in environment.")
+            raise Exception("ANTHROPIC_API_KEY is not set in environment")
         self.client = Anthropic(api_key=api_key)
         self.model_name = model_name
         self.max_tokens = max_tokens
