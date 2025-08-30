@@ -227,7 +227,9 @@ class EvalRunner:
         except APIStatusError as e:
             # 429 insufficient_quota, or other status codes
             if e.status_code == 429:
+                logger.warning(f"OpenAI API Key has insufficient quota: {e}")
                 return False
+            logger.warning(f"OpenAI API Status Error; treating as no-quota: {e}")
             return False
         except Exception as e:
             # includes 401 (bad key), 429 (insufficient_quota), network issues, etc.
