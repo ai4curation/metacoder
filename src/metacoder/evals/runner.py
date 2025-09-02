@@ -518,18 +518,21 @@ class EvalRunner:
 
     def save_results(self, results: List[EvalResult], output_path: Path):
         """Save evaluation results to file."""
-        # Convert to list of dicts
-        results_data = []
-        for result in results:
-            results_data.append(result.model_dump())
+        # output_path.parent.mkdir(parents=True, exist_ok=True)  # Not sure if the folder should be created here
+        data = {
+            "results": [r.model_dump() for r in results],
+            "summary": self.generate_summary(results),
+        }
 
-        # Save as YAML
-        with open(output_path, "w") as f:
-            yaml.dump(
-                {"results": results_data, "summary": self.generate_summary(results)},
+        # Append a new YAML document to the output file.
+        with open(output_path, "a", encoding="utf-8", newline="") as f:
+            yaml.safe_dump(
+                data,
                 f,
+                explicit_start=True,  # writes '---' to mark a new document
                 default_flow_style=False,
                 sort_keys=False,
+                allow_unicode=True,
             )
 
     def generate_summary(self, results: List[EvalResult]) -> Dict[str, Any]:
