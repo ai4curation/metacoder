@@ -201,7 +201,8 @@ class BaseCoder(BaseModel, ABC):
                 logger.info(f"{e}")
                 pass  # OK if not available (e.g., redirected or older Python)
 
-        def stream_output(pipe, output_lines, stream):  # lines are already str decoded as UTF-8
+        # lines are already str decoded as UTF-8
+        def stream_output(pipe, output_lines, stream):
             for line in iter(pipe.readline, ""):
                 if not quiet_mode:
                     print(line.rstrip(), file=stream)
