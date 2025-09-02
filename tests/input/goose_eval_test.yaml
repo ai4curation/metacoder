@@ -7,7 +7,7 @@ coders:
   goose: {}
 
 models:
-  gpt-4o:
+  claude-sonnet:
     provider: anthropic
     name: claude-sonnet-4-20250514
 
@@ -34,6 +34,9 @@ cases:
       MONDO:0011694 (spinocerebellar ataxia type 15/16, aka SCA15)
       MONDO:0007298 (spinocerebellar ataxia type 29, aka SCA29)
       MONDO:0008795 (aniridia-cerebellar ataxia-intellectual disability syndrome; aka Gillespie syndrome)
-
     threshold: 0.7
-    
+  - name: character_encoding_test
+    metrics: [CorrectnessMetric]
+    input: Based on PMID 33926573 do microbes from alkaline sulphidic tailings show oxidative stresses?
+    expected_output: 'The paper says No but it is retracted so the results should not be trusted.'
+    threshold: 0.9
