@@ -308,8 +308,6 @@ class EvalRunner:
 
                 # Note: This will downgrade a metric if needed each time it is about to be used without modifying the default metrics.
                 if not self.use_openai:
-                    from metacoder.evals.judges import ClaudeJudge
-
                     claude_model = "claude-3-5-sonnet-20240620"
                     logger.warning(
                         f"Downgrading {metric_name} model from {metric.model.model_name} to {claude_model}."
@@ -317,23 +315,28 @@ class EvalRunner:
 
                     try:
                         # Downgrade metric model to Claude judge.
-                        metric = make_geval(model=ClaudeJudge(claude_model))
-                        logger.warning(
+                        from metacoder.evals.judges import ClaudeJudge
+
+                        judge = ClaudeJudge(claude_model)
+
+                        if not judge.has_available_quota():
+                            raise Exception(
+                                "No Anthropic credits available for ClaudeJudge."
+                            )
+
+                        metric = make_geval(model=judge)
+                        logger.info(
                             f"Successfully downgraded {metric_name} model to {metric.model.model_name}."
                         )
                     except Exception as e:
                         # Fallback: if you can't use Claude, downgrade gracefully.
-                        logging.error(traceback.format_exc())
+                        logging.debug(traceback.format_exc())
+                        logger.debug(e)
                         logger.warning(
-                            "Claude unavailable (%s); downgrading {metric_name} to DummyMetric.",
-                            e,
+                            f"Claude unavailable ({e}); downgrading {metric_name} to DummyMetric."
                         )
                         metric = DummyMetric(threshold=0.5)
-                        logger.warning(
-                            f"Successfully downgraded {metric_name} to {metric.name}."
-                        )
-
-            logger.warning(f"Actual metric used: {metric.name}.")
+                        logger.warning(f"Downgraded {metric_name} to {metric.name}.")
 
             eval_results = evaluate(
                 [test_case],

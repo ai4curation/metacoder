@@ -1,11 +1,13 @@
 # metacoder/evals/judges.py
-
+import logging
 import os
 
 from anthropic import Anthropic
 from anthropic.types import MessageParam, TextBlockParam, TextBlock
 
 from deepeval.models.base_model import DeepEvalBaseLLM
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeJudge(DeepEvalBaseLLM):
@@ -55,3 +57,29 @@ class ClaudeJudge(DeepEvalBaseLLM):
 
     def get_model_name(self) -> str:
         return self.model_name
+
+    def has_available_quota(self) -> bool:
+        """
+        Try a very lightweight request to check if quota is available.
+        Returns True if quota exists, False if Anthropic responds with
+        quota-related errors.
+        """
+        try:
+            # Use a minimal "ping" request
+            content: list[TextBlockParam] = [{"type": "text", "text": "ping"}]
+            messages: list[MessageParam] = [{"role": "user", "content": content}]
+            self.client.messages.create(
+                model=self.model_name,
+                max_tokens=1,  # cheapest possible
+                temperature=0.0,
+                messages=messages,
+            )
+            return True
+        except Exception as e:
+            msg = str(e).lower()
+            # Check for insufficient quota:
+            # 400 Bad Request. Message: Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.
+            if "credit balance is too low" in msg or "400" in msg:
+                logger.warning(f"ClaudeJudge quota check failed: {e}")
+                return False
+            raise
