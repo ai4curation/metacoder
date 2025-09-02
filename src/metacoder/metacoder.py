@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 from typing import Optional, Union
 
@@ -542,6 +543,17 @@ def eval_command(config: str, output: str, workdir: str, coders: tuple, verbose:
     config_path = Path(config)
     output_path = Path(output)
     workdir_path = Path(workdir)
+
+    try:
+        # Create the output file only if it doesn't exist; fail if it does
+        with output_path.open("x", encoding="utf-8") as _:
+            pass
+    except FileExistsError:
+        print(
+            f"Error: '{output_path}' already exists. Please delete it or specify a different filename.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Convert coders tuple to list (empty tuple if not specified)
     coders_list = list(coders) if coders else None
