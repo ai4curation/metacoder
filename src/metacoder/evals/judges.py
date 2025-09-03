@@ -16,9 +16,17 @@ class ClaudeJudge(DeepEvalBaseLLM):
     the `model` parameter to DeepEval metrics like GEval.
     """
 
+    # Note: Anthropic models can be listed via:
+    # curl https://api.anthropic.com/v1/models --header "x-api-key: %ANTHROPIC_API_KEY%" --header "anthropic-version: 2023-06-01"
+    # {"data": [{"type": "model", "id": "claude-opus-4-1-20250805", "display_name": "Claude Opus 4.1", "created_at": "2025-08-05T00:00:00Z"}, ... ]}
+    # Current list (September 3, 2025):
+    # claude-opus-4-1-20250805, claude-opus-4-20250514, claude-sonnet-4-20250514, claude-3-7-sonnet-20250219,
+    # claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022, claude-3-5-sonnet-20240620, claude-3-haiku-20240307,
+    # claude-3-opus-20240229
+
     def __init__(
         self,
-        model_name: str = "claude-3-5-sonnet-20240620",
+        model_name: str = "claude-sonnet-4-20250514",
         max_tokens: int = 1024,
         temperature: float = 0.0,
     ):
