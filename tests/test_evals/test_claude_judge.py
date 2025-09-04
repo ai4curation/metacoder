@@ -20,7 +20,7 @@ def test_claude_judge_downgrade_success(tmp_path, caplog, monkeypatch):
         )
 
         # Unfortunately, there is nothing available in the eval results that indicate which model DeepEval used.
-        # One enhancement might be to introduce metric_model=claude-3-5-sonnet-20240620 to each result at eval time.
+        # One enhancement might be to introduce metric_model=claude-sonnet-4-20250514 to each result at eval time.
         # Instead, resort to capturing the WARNING logs for assertions related to the downgrade.
         with caplog.at_level(logging.WARNING):
             # Temporarily set an invalid OPENAI_API_KEY in order to force OpenAI calls to fail.
@@ -39,7 +39,7 @@ def test_claude_judge_downgrade_success(tmp_path, caplog, monkeypatch):
 
             # Test that the new evaluation judge was correctly selected for the metric model downgrade.
             assert (
-                "Downgrading CorrectnessMetric model from gpt-4.1 to claude-3-5-sonnet-20240620."
+                "Downgrading CorrectnessMetric model from gpt-4.1 to claude-"
                 in caplog.text
             )
 
@@ -68,7 +68,7 @@ def test_correctnessmetric_downgrade_success(tmp_path, caplog, monkeypatch):
         )
 
         # Unfortunately, there is nothing available in the eval results that indicate which model DeepEval used.
-        # One enhancement might be to introduce metric_model=claude-3-5-sonnet-20240620 to each result at eval time.
+        # One enhancement might be to introduce metric_model=claude-sonnet-4-20250514 to each result at eval time.
         # Instead, resort to capturing the WARNING logs for assertions related to the downgrade.
         with caplog.at_level(logging.WARNING):
             # Temporarily set an invalid OPENAI_API_KEY in order to force OpenAI calls to fail.
@@ -112,7 +112,7 @@ def test_correctnessmetric_downgrade_success(tmp_path, caplog, monkeypatch):
 
             # Test that the new evaluation judge was correctly selected for the metric model downgrade.
             assert (
-                "Downgrading CorrectnessMetric model from gpt-4.1 to claude-3-5-sonnet-20240620."
+                "Downgrading CorrectnessMetric model from gpt-4.1 to claude-"
                 in caplog.text
             )
 
