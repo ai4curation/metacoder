@@ -11,32 +11,45 @@ models:
     provider: anthropic
     name: claude-sonnet-4-20250514
 
+# Refer to metacoder/src/mcps/registry/scilit.yaml for the list of available MCPs.
 servers:
-  mcp-simple-pubmed:
+  artl:
+    name: artl
+    command: uvx
+    args: [artl-mcp]
+  simple-pubmed:
     name: pubmed
     command: uvx
     args: [mcp-simple-pubmed]
     env:
       PUBMED_EMAIL: cjmungall@lbl.gov
-  ols-mcp:
+  ols:
     name: ols
     command: uvx
     args: [mcp-ols]
 
 server_combinations:
-  - [mcp-simple-pubmed, ols-mcp]
+#  - [artl, simple-pubmed, ols]
+  - [artl]
+  - [simple-pubmed]
+#  - [ols]
 
 cases:
-  - name: "disease"
-    metrics: [CorrectnessMetric]
-    input: "According to PMID:35743164, What 3 diseases are associated with ITPR1 mutations? Give me disease names and MONDO IDs"
-    expected_output: |
-      MONDO:0011694 (spinocerebellar ataxia type 15/16, aka SCA15)
-      MONDO:0007298 (spinocerebellar ataxia type 29, aka SCA29)
-      MONDO:0008795 (aniridia-cerebellar ataxia-intellectual disability syndrome; aka Gillespie syndrome)
-    threshold: 0.7
-  - name: character_encoding_test
-    metrics: [CorrectnessMetric]
-    input: Based on PMID 33926573 do microbes from alkaline sulphidic tailings show oxidative stresses?
-    expected_output: 'The paper says No but it is retracted so the results should not be trusted.'
-    threshold: 0.9
+- name: PMID_28027860_Full_Text
+#  group: Text extraction # should default to "Default"
+  metrics:
+  - CorrectnessMetric
+  input: "What is the first sentence of section 2 in PMID: 28027860?"
+  expected_output: "Even though many of NFLE's core features have been clarified in the last two decades, some critical issues remain controversial."
+  threshold: 0.9
+
+# Per convo with Charles, Justin, Mark: this test case is kind of tricky and it seems
+# like an extremely difficult case that even a good LLM + MCP might not pass. We've
+# made some edits to give the LLM + MCP a fair chance
+- name: PMC8086273_Retraction
+  group: Summarization
+  metrics:
+  - CorrectnessMetric
+  input: "Based on PMID 33926573 do microbes from alkaline sulphidic tailings show oxidative stresses?"
+  expected_output: "The paper says No but it is retracted so the results should not be trusted."
+  threshold: 0.9

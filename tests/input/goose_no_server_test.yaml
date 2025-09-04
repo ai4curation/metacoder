@@ -16,7 +16,7 @@ servers:
     command: uvx
     args: [mcp-simple-pubmed]
     env:
-      PUBMED_EMAIL: ctparker@lbl.gov
+      PUBMED_EMAIL: cjmungall@lbl.gov
 
 #server_combinations:
 #  - [mcp-simple-pubmed]

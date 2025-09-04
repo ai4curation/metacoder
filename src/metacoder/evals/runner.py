@@ -121,6 +121,7 @@ class EvalResult(BaseModel):
     model: str
     coder: str
     case_name: str
+    case_group: str
     metric_name: str
     score: float
     passed: bool
@@ -386,6 +387,7 @@ class EvalRunner:
                 model=model_name,
                 coder=coder_name,
                 case_name=case.name,
+                case_group=case.group,
                 metric_name=metric_name,
                 score=score if score is not None else 0.0,
                 passed=passed,
