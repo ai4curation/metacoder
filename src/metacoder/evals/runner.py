@@ -524,7 +524,7 @@ class EvalRunner:
             results_data.append(result.model_dump())
 
         # Save as YAML
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             yaml.dump(
                 {"results": results_data, "summary": self.generate_summary(results)},
                 f,
