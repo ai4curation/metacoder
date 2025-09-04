@@ -309,7 +309,7 @@ class EvalRunner:
 
                 # Note: This will downgrade a metric if needed each time it is about to be used without modifying the default metrics.
                 if not self.use_openai:
-                    claude_model = "claude-3-5-sonnet-20240620"
+                    claude_model = "claude-sonnet-4-20250514"
                     logger.warning(
                         f"Downgrading {metric_name} model from {metric.model.model_name} to {claude_model}."
                     )
