@@ -484,7 +484,7 @@ class EvalRunner:
                             else " (no servers)"
                         )
                         logger.info(
-                            f"Progress: {current}/{total_combinations} - {coder_name}/{model_name}/{case.name}{server_desc}"
+                            f"Progress: {current}/{total_combinations} ({coder_name} | {model_name} | {case.name}{server_desc})"
                         )
 
                         # Create unique workdir for this combination
