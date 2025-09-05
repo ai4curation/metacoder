@@ -145,6 +145,8 @@ class GooseCoder(BaseCoder):
         env = self.expand_env(self.env)
         self.prepare_workdir()
         with change_directory(self.workdir):
+            # disable keyring (prevents errors on MacOS and Linux)
+            env["GOOSE_DISABLE_KEYRING"] = "1"
             # important - ensure that only local config files are used
             # we assue chdir has been called beforehand
             env["HOME"] = "."
