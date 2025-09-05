@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import time
 import logging
@@ -149,7 +150,7 @@ class GooseCoder(BaseCoder):
             env["GOOSE_DISABLE_KEYRING"] = "1"
             # important - ensure that only local config files are used
             # we assue chdir has been called beforehand
-            env["HOME"] = "."
+            env["HOME"] = os.getcwd()
             text = self.expand_prompt(input_text)
             command = ["goose", "run", "-t", text]
             logger.info(f"🦆 Running command: {' '.join(command)}")
