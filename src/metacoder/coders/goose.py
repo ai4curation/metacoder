@@ -154,13 +154,18 @@ class GooseCoder(BaseCoder):
         self.prepare_workdir()
         with change_directory(self.workdir):
             goose_path = find_goose()
-            logger.info(f"Using goose executable at: {goose_path}")
+            logger.debug(f"Using goose executable at: {goose_path}")
 
             # disable keyring (prevents errors on MacOS and Linux)
             env["GOOSE_DISABLE_KEYRING"] = "1"
-            # important - ensure that only local config files are used
-            # we assue chdir has been called beforehand
-            env["XDG_CONFIG_HOME"] = os.getcwd()
+            # Important:
+            # (1) ensure that only local config files are used;
+            # (2) assume chdir has been called beforehand.
+            cwd = os.getcwd()
+            local_home_path = Path(cwd)
+            home_env_var = "XDG_CONFIG_HOME"
+            env[home_env_var] = str(local_home_path)
+
             text = self.expand_prompt(input_text)
             command = [str(goose_path), "run", "-t", text]
             logger.info(f"🦆 Running command: {' '.join(command)}")
