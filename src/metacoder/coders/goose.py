@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 from pathlib import Path
 import time
 import logging
@@ -25,6 +26,14 @@ def find_goose() -> Path:
     if not loc:
         raise FileNotFoundError("goose not found on PATH")
     return Path(loc).resolve()
+
+
+def get_goose_config_path() -> str:
+    # OS-specific config layout
+    if platform.system().lower().startswith("win"):
+        return "Block\\goose\\config\\"
+
+    return ".config/goose/"
 
 
 class GooseCoder(BaseCoder):
@@ -140,7 +149,7 @@ class GooseCoder(BaseCoder):
         return [
             CoderConfigObject(
                 file_type=FileType.YAML,
-                relative_path=".config/goose/config.yaml",
+                relative_path=get_goose_config_path() + "config.yaml",
                 content=config_content,
             )
         ]
@@ -156,14 +165,29 @@ class GooseCoder(BaseCoder):
             goose_path = find_goose()
             logger.debug(f"Using goose executable at: {goose_path}")
 
+            # Build environment with redirected config
+
             # disable keyring (prevents errors on MacOS and Linux)
             env["GOOSE_DISABLE_KEYRING"] = "1"
+
             # Important:
             # (1) ensure that only local config files are used;
             # (2) assume chdir has been called beforehand.
             cwd = os.getcwd()
             local_home_path = Path(cwd)
-            home_env_var = "XDG_CONFIG_HOME"
+
+            # OS-specific config layout
+            goose_config_dir = local_home_path / get_goose_config_path()
+            # OS-specific home directory environment variable
+            if platform.system().lower().startswith("win"):
+                home_env_var = "APPDATA"
+            else:
+                home_env_var = "XDG_CONFIG_HOME"
+
+            goose_cfg_path = goose_config_dir / "config.yaml"
+
+            logger.info(f"Goose config: {goose_cfg_path}\n")
+
             env[home_env_var] = str(local_home_path)
 
             text = self.expand_prompt(input_text)
