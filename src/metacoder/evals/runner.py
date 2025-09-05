@@ -258,7 +258,7 @@ class EvalRunner:
         # Create coder instance
         coder = create_coder(
             coder_name,
-            workdir=str(workdir / f"{model_name}_{coder_name}_{case.name}"),
+            workdir=str(workdir),
             config=coder_config,
         )
 
