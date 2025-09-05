@@ -20,6 +20,13 @@ from metacoder.configuration import ConfigFileRole, MCPConfig, MCPType
 logger = logging.getLogger(__name__)
 
 
+def find_goose() -> Path:
+    loc = shutil.which("goose")
+    if not loc:
+        raise FileNotFoundError("goose not found on PATH")
+    return Path(loc).resolve()
+
+
 class GooseCoder(BaseCoder):
     """
     Note that running goose involves simulating a home directory in
@@ -146,13 +153,16 @@ class GooseCoder(BaseCoder):
         env = self.expand_env(self.env)
         self.prepare_workdir()
         with change_directory(self.workdir):
+            goose_path = find_goose()
+            logger.info(f"Using goose executable at: {goose_path}")
+
             # disable keyring (prevents errors on MacOS and Linux)
             env["GOOSE_DISABLE_KEYRING"] = "1"
             # important - ensure that only local config files are used
             # we assue chdir has been called beforehand
             env["XDG_CONFIG_HOME"] = os.getcwd()
             text = self.expand_prompt(input_text)
-            command = ["goose", "run", "-t", text]
+            command = [str(goose_path), "run", "-t", text]
             logger.info(f"🦆 Running command: {' '.join(command)}")
             # time the command
             start_time = time.time()
