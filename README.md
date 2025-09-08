@@ -109,7 +109,7 @@ cases:
 
 ## Getting Started
 
-- [Installation and Setuphttps://ai4curation.github.io/metacoder/getting-started)
+- [Installation and Setup](https://ai4curation.github.io/metacoder/getting-started)
 - [Supported Coders](https://ai4curation.github.io/metacoder/coders/)
 - [Configuration Guide](https://ai4curation.github.io/metacoder/configuration)
 - [MCP Support](https://ai4curation.github.io/metacoder/mcps) - Extend your AI coders with additional tools
