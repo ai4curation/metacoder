@@ -156,7 +156,7 @@ class GooseCoder(BaseCoder):
             result = self.run_process(command, env)
             end_time = time.time()
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)
-            logger.info(f"🦆 Command took {end_time - start_time} seconds")
+            logger.info(f"🦆 Command took {end_time - start_time:.2f} seconds")
             # look in output text for a file like: logging to ./.local/share/goose/sessions/20250613_120403.jsonl
             session_file: Optional[Path] = None
             for line in result.stdout.split("\n"):
@@ -165,7 +165,7 @@ class GooseCoder(BaseCoder):
                     session_file = Path(session_file_str)
                     break
             if session_file and session_file.exists():
-                with open(session_file, "r") as f:
+                with open(session_file, "r", encoding="utf-8") as f:
                     ao.structured_messages = [
                         json.loads(line) for line in f if line.strip()
                     ]

@@ -156,7 +156,7 @@ class GeminiCoder(BaseCoder):
                 )
 
             end_time = time.time()
-            logger.info(f"💎 Command took {end_time - start_time} seconds")
+            logger.info(f"💎 Command took {end_time - start_time:.2f} seconds")
 
             # Parse the output
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)

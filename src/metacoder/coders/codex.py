@@ -115,7 +115,7 @@ class CodexCoder(BaseCoder):
             if "result" in message:
                 ao.result_text = message["result"]
         end_time = time.time()
-        print(f"🤖 Command took {end_time - start_time} seconds")
+        print(f"🤖 Command took {end_time - start_time:.2f} seconds")
         ao.total_cost_usd = total_cost_usd
         ao.success = not is_error
         if not ao.success:

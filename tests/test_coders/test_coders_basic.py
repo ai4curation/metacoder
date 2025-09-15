@@ -3,6 +3,7 @@
 These tests check that each coder can handle a simple arithmetic question.
 """
 
+import json
 import tempfile
 import pytest
 
@@ -164,3 +165,16 @@ def test_dummy_coder_always_works():
         assert result is not None
         assert result.result_text == "you said: Hello, world!"
         assert result.stdout == "you said: Hello, world!"
+
+
+@pytest.mark.integration
+def test_goose_utf8_session_file(tmp_path):
+    """Test session files with UTF-8 content are read correctly."""
+    session_content = '{"role": "assistant", "content": "测试 résumé 🚀"}\n'
+    session_file = tmp_path / "test_session.jsonl"
+    session_file.write_text(session_content, encoding="utf-8")
+
+    with open(session_file, "r", encoding="utf-8") as f:
+        messages = [json.loads(line) for line in f if line.strip()]
+    assert len(messages) == 1
+    assert "测试" in messages[0]["content"]
