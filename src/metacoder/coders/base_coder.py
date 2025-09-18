@@ -365,7 +365,8 @@ class BaseCoder(BaseModel, ABC):
 
         if self.config_objects is None:
             self.config_objects = self.default_config_objects()
-        logger.info(f"📁 Preparing workdir: {self.workdir}")
+        logger.info(f"📁 Preparing workdir (relative): {self.workdir}")
+        logger.info(f"                     (resolved): {Path(self.workdir).resolve()}")
         with change_directory(self.workdir):
             # clear old config objects
             for path, _type in self.default_config_paths().items():
@@ -379,7 +380,10 @@ class BaseCoder(BaseModel, ABC):
                         path.unlink()
             logger.debug(f"🔧 Writing config objects: {self.config_objects}")
             for config_object in self.config_objects:
-                path = Path(config_object.relative_path)
+                rel = Path(config_object.relative_path)
+                if rel.is_absolute():
+                    raise ValueError(f"Config object path must be relative: {rel}")
+                path = rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 logger.info(
                     f"🔧 Writing config object: {config_object.relative_path} type={config_object.file_type}"
