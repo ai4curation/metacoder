@@ -21,6 +21,9 @@ class EvalCase(BaseModel):
     """
 
     name: str = Field(..., description="Unique identifier for the test case")
+    group: Optional[str] = Field(
+        default="Default", description="Test category for result grouping."
+    )
     metrics: List[str] = Field(
         ...,
         description="List of metric names to apply (e.g., CorrectnessMetric, FaithfulnessMetric)",

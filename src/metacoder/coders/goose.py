@@ -1,4 +1,6 @@
 import json
+import os
+import platform
 from pathlib import Path
 import time
 import logging
@@ -17,6 +19,80 @@ from metacoder.configuration import ConfigFileRole, MCPConfig, MCPType
 
 
 logger = logging.getLogger(__name__)
+
+
+def find_goose() -> Path:
+    loc = shutil.which("goose")
+    if not loc:
+        raise FileNotFoundError("goose not found on PATH")
+    return Path(loc).resolve()
+
+
+def get_home_env_var() -> str:
+    """
+    Determine the environment variable Goose should treat as "home"
+    for locating configuration files.
+
+    Windows:
+        Goose expects its configuration under:
+            %APPDATA%\\Block\\goose\\config\\
+        Therefore, we override APPDATA to point into the working directory.
+
+    Unix-like (Linux, macOS):
+        Goose follows the XDG Base Directory spec:
+            - If $XDG_CONFIG_HOME is set, config goes under:
+                  $XDG_CONFIG_HOME/goose/config.yaml
+            - Otherwise it falls back to:
+                  $HOME/.config/goose/config.yaml
+
+        We mirror this behavior by checking whether XDG_CONFIG_HOME is set
+        in the environment. If it is set, return "XDG_CONFIG_HOME";
+        otherwise, return "HOME".
+
+    Returns:
+        str: The environment variable name that should be overridden to
+             redirect Goose’s config into the working directory.
+    """
+    if platform.system().lower().startswith("win"):
+        return "APPDATA"
+
+    if "XDG_CONFIG_HOME" in os.environ and os.environ["XDG_CONFIG_HOME"]:
+        return "XDG_CONFIG_HOME"
+    return "HOME"
+
+
+def get_goose_config_path() -> Path:
+    """
+    Get the relative config path (from the simulated home directory)
+    where Goose expects its configuration, based on the home
+    environment variable chosen by get_home_env_var().
+
+    Returns:
+        pathlib.Path: The relative config directory path.
+
+    Behavior:
+        - If get_home_env_var() == "APPDATA":
+            Path -> "Block/goose/config/"
+            (matches %APPDATA%\\Block\\goose\\config\\ on Windows)
+
+        - If get_home_env_var() == "HOME":
+            Path -> ".config/goose/"
+            (matches $HOME/.config/goose/ on Unix-like systems)
+
+        - If get_home_env_var() == "XDG_CONFIG_HOME":
+            Path -> "goose/"
+            (matches $XDG_CONFIG_HOME/goose/ on Unix-like systems)
+    """
+    home_env_var = get_home_env_var()
+
+    if home_env_var == "APPDATA":
+        return Path("Block/goose/config/")
+    elif home_env_var == "HOME":
+        return Path(".config/goose/")
+    elif home_env_var == "XDG_CONFIG_HOME":
+        return Path("goose/")
+    else:
+        raise RuntimeError(f"Unhandled home env var: {home_env_var}")
 
 
 class GooseCoder(BaseCoder):
@@ -48,6 +124,11 @@ class GooseCoder(BaseCoder):
             "timeout": 300,  # Default timeout
             "type": "stdio" if mcp.type == MCPType.STDIO else mcp.type.value,
         }
+
+        is_stdio = mcp.type == MCPType.STDIO
+
+        if is_stdio and not mcp.command:
+            raise ValueError("STDIO MCP configuration requires 'command'.")
 
         if mcp.description:
             extension["description"] = mcp.description
@@ -129,10 +210,12 @@ class GooseCoder(BaseCoder):
 
         config_content["extensions"] = extensions
 
+        cfg_rel = get_goose_config_path() / "config.yaml"
+
         return [
             CoderConfigObject(
                 file_type=FileType.YAML,
-                relative_path=".config/goose/config.yaml",
+                relative_path=str(cfg_rel),
                 content=config_content,
             )
         ]
@@ -145,18 +228,38 @@ class GooseCoder(BaseCoder):
         env = self.expand_env(self.env)
         self.prepare_workdir()
         with change_directory(self.workdir):
-            # important - ensure that only local config files are used
-            # we assue chdir has been called beforehand
-            env["HOME"] = "."
+            goose_path = find_goose()
+            logger.debug(f"Using goose executable at: {goose_path}")
+
+            # Build environment with redirected config
+
+            # disable keyring (prevents errors on MacOS and Linux)
+            env["GOOSE_DISABLE_KEYRING"] = "1"
+
+            # Important:
+            # (1) ensure that only local config files are used;
+            # (2) assume chdir has been called beforehand.
+            cwd = os.getcwd()
+            local_home_path = Path(cwd)
+
+            # OS-specific config layout
+            home_env_var = get_home_env_var()
+            env[home_env_var] = str(local_home_path)
+
+            goose_config_dir = local_home_path / get_goose_config_path()
+            goose_cfg_path = goose_config_dir / "config.yaml"
+            logger.info(f"Goose home var: {home_env_var} -> {env[home_env_var]}")
+            logger.info(f"Goose config (expected at): {goose_cfg_path}")
+
             text = self.expand_prompt(input_text)
-            command = ["goose", "run", "-t", text]
+            command = [str(goose_path), "run", "-t", text]
             logger.info(f"🦆 Running command: {' '.join(command)}")
             # time the command
             start_time = time.time()
             result = self.run_process(command, env)
             end_time = time.time()
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)
-            logger.info(f"🦆 Command took {end_time - start_time} seconds")
+            logger.info(f"🦆 Command took {end_time - start_time:.2f} seconds")
             # look in output text for a file like: logging to ./.local/share/goose/sessions/20250613_120403.jsonl
             session_file: Optional[Path] = None
             for line in result.stdout.split("\n"):
@@ -165,7 +268,7 @@ class GooseCoder(BaseCoder):
                     session_file = Path(session_file_str)
                     break
             if session_file and session_file.exists():
-                with open(session_file, "r") as f:
+                with open(session_file, "r", encoding="utf-8") as f:
                     ao.structured_messages = [
                         json.loads(line) for line in f if line.strip()
                     ]

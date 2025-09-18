@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 from typing import Optional, Union
 
@@ -543,6 +544,17 @@ def eval_command(config: str, output: str, workdir: str, coders: tuple, verbose:
     output_path = Path(output)
     workdir_path = Path(workdir)
 
+    try:
+        # Create the output file only if it doesn't exist; fail if it does
+        with output_path.open("x", encoding="utf-8") as _:
+            pass
+    except FileExistsError:
+        print(
+            f"Error: '{output_path}' already exists. Please delete it or specify a different filename.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Convert coders tuple to list (empty tuple if not specified)
     coders_list = list(coders) if coders else None
 
@@ -592,37 +604,43 @@ def eval_command(config: str, output: str, workdir: str, coders: tuple, verbose:
 
     # Print summary
     summary = runner.generate_summary(results)
+    frac_passed = (
+        summary["passed"] / summary["total_evaluations"]
+        if summary["total_evaluations"]
+        else 0
+    )
+    frac_failed = (
+        summary["failed"] / summary["total_evaluations"]
+        if summary["total_evaluations"]
+        else 0
+    )
+
     click.echo("\n📈 Summary:")
     click.echo(f"   Total: {summary['total_evaluations']}")
-    click.echo(
-        f"   Passed: {summary['passed']} ({summary['passed'] / summary['total_evaluations'] * 100:.1f}%)"
-    )
-    click.echo(
-        f"   Failed: {summary['failed']} ({summary['failed'] / summary['total_evaluations'] * 100:.1f}%)"
-    )
-    if summary["errors"] > 0:
-        click.echo(f"   Errors: {summary['errors']} ⚠️")
+    click.echo(f"   Passed: {summary['passed']} ({frac_passed:.1%})")
+    click.echo(f"   Failed: {summary['failed']} ({frac_failed:.1%})")
+    click.echo(f"   Errors: {summary['errors']} ⚠️") if summary["errors"] else None
 
     # Print by-coder summary
     if len(summary["by_coder"]) > 1:
         click.echo("\n   By Coder:")
         for coder, stats in summary["by_coder"].items():
-            pass_rate = (
-                stats["passed"] / stats["total"] * 100 if stats["total"] > 0 else 0
+            coder_frac_passed = (
+                stats["passed"] / stats["total"] if stats["total"] else 0
             )
             click.echo(
-                f"     {coder}: {stats['passed']}/{stats['total']} ({pass_rate:.1f}%)"
+                f"     {coder}: {stats['passed']} / {stats['total']} ({coder_frac_passed:.1%})"
             )
 
     # Print by-model summary
     if len(summary["by_model"]) > 1:
         click.echo("\n   By Model:")
         for model, stats in summary["by_model"].items():
-            pass_rate = (
-                stats["passed"] / stats["total"] * 100 if stats["total"] > 0 else 0
+            model_frac_passed = (
+                stats["passed"] / stats["total"] if stats["total"] else 0
             )
             click.echo(
-                f"     {model}: {stats['passed']}/{stats['total']} ({pass_rate:.1f}%)"
+                f"     {model}: {stats['passed']} / {stats['total']} ({model_frac_passed:.1%})"
             )
 
     click.echo("\n✅ Evaluation complete!")

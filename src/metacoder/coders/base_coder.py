@@ -173,11 +173,15 @@ class BaseCoder(BaseModel, ABC):
         """
         if env is None:
             env = self.expand_env(self.env)
+
+        # Decode the child process output as UTF-8 (instead of default encoding)
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",  # avoid crashes on the occasional bad byte
             env=env,
             bufsize=1,
             universal_newlines=True,
@@ -189,6 +193,15 @@ class BaseCoder(BaseModel, ABC):
         # check verbosity level
         quiet_mode = logger.getEffectiveLevel() <= logging.INFO
 
+        # Ensure our own stdout/stderr won't choke on non-ASCII (Windows consoles often do).
+        for s in (sys.stdout, sys.stderr):
+            try:
+                s.reconfigure(encoding="utf-8", errors="replace")  # Python 3.7+
+            except Exception as e:
+                logger.info(f"{e}")
+                pass  # OK if not available (e.g., redirected or older Python)
+
+        # lines are already str decoded as UTF-8
         def stream_output(pipe, output_lines, stream):
             for line in iter(pipe.readline, ""):
                 if not quiet_mode:
@@ -352,7 +365,8 @@ class BaseCoder(BaseModel, ABC):
 
         if self.config_objects is None:
             self.config_objects = self.default_config_objects()
-        logger.info(f"📁 Preparing workdir: {self.workdir}")
+        logger.info(f"📁 Preparing workdir (relative): {self.workdir}")
+        logger.info(f"                     (resolved): {Path(self.workdir).resolve()}")
         with change_directory(self.workdir):
             # clear old config objects
             for path, _type in self.default_config_paths().items():
@@ -366,7 +380,10 @@ class BaseCoder(BaseModel, ABC):
                         path.unlink()
             logger.debug(f"🔧 Writing config objects: {self.config_objects}")
             for config_object in self.config_objects:
-                path = Path(config_object.relative_path)
+                rel = Path(config_object.relative_path)
+                if rel.is_absolute():
+                    raise ValueError(f"Config object path must be relative: {rel}")
+                path = rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 logger.info(
                     f"🔧 Writing config object: {config_object.relative_path} type={config_object.file_type}"

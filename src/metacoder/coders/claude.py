@@ -246,7 +246,7 @@ class ClaudeCoder(BaseCoder):
                 ao.tool_uses = tool_uses
 
             end_time = time.time()
-            logger.info(f"🤖 Command took {end_time - start_time} seconds")
+            logger.info(f"🤖 Command took {end_time - start_time:.2f} seconds")
             ao.total_cost_usd = total_cost_usd
             ao.success = not is_error
             if not ao.success:
