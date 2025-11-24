@@ -28,7 +28,7 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from metacoder.coders.base_coder import BaseCoder, CoderOutput
 from metacoder.registry import AVAILABLE_CODERS
-from metacoder.evals.eval_model import EvalCase, EvalDataset
+from metacoder.evals.eval_model import EvalCase, EvalDataset, MetricConfig
 from metacoder.configuration import AIModelConfig, CoderConfig
 
 logger = logging.getLogger(__name__)
@@ -65,11 +65,14 @@ class DummyMetric(BaseMetric):
 
 
 def make_geval(model: Optional[DeepEvalBaseLLM] = None) -> GEval:
-    """Creates a GEval instance with the specified model."""
+    """Creates a GEval instance with the specified model.
+
+    Uses evaluation_steps (not criteria) for more reliable scoring across runs.
+    """
     return GEval(
         name="Correctness",
-        criteria="Determine whether the actual output is factually correct based on the expected output.",
         # NOTE: you can only provide either criteria or evaluation_steps, and not both
+        # Using evaluation_steps for more control and reliability
         evaluation_steps=[
             "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
             "You should also heavily penalize omission of detail",
@@ -83,6 +86,63 @@ def make_geval(model: Optional[DeepEvalBaseLLM] = None) -> GEval:
         ],
         model=model,  # may be None (defaults to OpenAI) or a Claude judge
     )
+
+
+def make_custom_geval(
+    metric_config: MetricConfig, model: Optional[DeepEvalBaseLLM] = None
+) -> GEval:
+    """Creates a GEval instance with custom criteria/rubric/evaluation_steps from MetricConfig.
+
+    Args:
+        metric_config: Configuration with custom evaluation parameters
+        model: Optional LLM model (defaults to OpenAI GPT-4)
+
+    Returns:
+        Configured GEval instance
+
+    Note:
+        criteria and evaluation_steps are mutually exclusive (enforced by MetricConfig validator).
+        evaluation_steps provides more control and reliability, while criteria auto-generates steps.
+    """
+    from deepeval.metrics.g_eval.utils import Rubric
+
+    # Convert rubric if provided
+    rubrics = []
+    if metric_config.rubric:
+        for item in metric_config.rubric:
+            rubrics.append(
+                Rubric(
+                    score_range=(item.score, item.score),
+                    expected_outcome=item.criteria,
+                )
+            )
+
+    # Build kwargs for GEval
+    kwargs = {
+        "name": metric_config.name,
+        "evaluation_params": [
+            LLMTestCaseParams.INPUT,
+            LLMTestCaseParams.ACTUAL_OUTPUT,
+            LLMTestCaseParams.EXPECTED_OUTPUT,
+        ],
+        "model": model,
+    }
+
+    # Add evaluation_steps OR criteria (mutually exclusive)
+    # Note: Pydantic validator already ensures mutual exclusivity
+    if metric_config.evaluation_steps:
+        kwargs["evaluation_steps"] = metric_config.evaluation_steps
+    elif metric_config.criteria:
+        kwargs["criteria"] = metric_config.criteria
+    else:
+        # Default criteria if only rubric provided
+        kwargs["criteria"] = "Evaluate the actual output based on the rubric criteria."
+
+    # Add rubric if provided
+    if rubrics:
+        kwargs["rubric"] = rubrics
+
+    return GEval(**kwargs)
 
 
 def get_default_metrics(
@@ -282,14 +342,31 @@ class EvalRunner:
         execution_time = time.time() - start_time
 
         # Run each metric
-        for metric_name in case.metrics:
-            default_metrics = get_default_metrics()
-            if metric_name in default_metrics:
-                metric = default_metrics[metric_name]
+        for metric_item in case.metrics:
+            # Handle both string metrics and MetricConfig objects
+            if isinstance(metric_item, str):
+                # Original behavior: string metric name
+                metric_name = metric_item
+                metric_config = None
             else:
-                # Get metric class and instantiate
-                metric_class = self.get_metric_class(metric_name)
-                metric = metric_class(threshold=case.threshold)  # type: ignore
+                # New behavior: MetricConfig object with potential custom rubric
+                metric_name = metric_item.name
+                metric_config = metric_item
+
+            # Create the metric instance
+            if metric_config and (metric_config.rubric or metric_config.criteria or metric_config.evaluation_steps):
+                # Use custom configuration if provided
+                logger.info(f"Using custom configuration for {metric_name}")
+                metric = make_custom_geval(metric_config, model=None)
+            else:
+                # Use default metric behavior
+                default_metrics = get_default_metrics()
+                if metric_name in default_metrics:
+                    metric = default_metrics[metric_name]
+                else:
+                    # Get metric class and instantiate
+                    metric_class = self.get_metric_class(metric_name)
+                    metric = metric_class(threshold=case.threshold)  # type: ignore
 
             # Create test case
             test_case = self.create_test_case(case, actual_output)
