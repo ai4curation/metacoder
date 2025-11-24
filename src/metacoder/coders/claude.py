@@ -260,5 +260,6 @@ class ClaudeCoder(BaseCoder):
                         f"Claude authentication failed. Try setting ANTHROPIC_AUTH_TOKEN environment variable or run 'claude setup-token'. "
                         f"For custom endpoints, also set ANTHROPIC_BASE_URL. Original error: {ao.stderr} // {ao}"
                     )
-                raise ValueError(f"Claude failed with error: {ao.stderr} // {ao}")
+                # Don't raise for other errors - let evaluation continue and mark test as failed
+                logger.warning(f"Claude returned error (test will be marked as failed): {ao.result_text}")
             return ao
