@@ -136,9 +136,9 @@ class GeminiCoder(BaseCoder):
             text = self.expand_prompt(input_text)
 
             # Build the command
-            # The gemini CLI uses conversational interface, so we need to handle it differently
-            # For now, we'll use echo to pipe the prompt
-            command = ["sh", "-c", f'echo "{text}" | gemini']
+            # The gemini CLI accepts the prompt as a positional argument
+            # We pass it directly as an argument to avoid shell escaping issues
+            command = ["gemini", text]
 
             logger.info("💎 Running command: gemini with prompt")
             logger.debug(f"💎 Full command: {' '.join(command)}")
