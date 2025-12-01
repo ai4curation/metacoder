@@ -4,6 +4,8 @@ import time
 import logging
 import shutil
 import re
+import json
+import os
 from typing import Any
 
 from metacoder.coders.base_coder import (
@@ -116,6 +118,25 @@ class GeminiCoder(BaseCoder):
                     content=settings_content,
                 )
             )
+
+        # Copy OAuth credentials from user's home directory if they exist
+        # Gemini CLI uses OAuth for authentication, and credentials are stored
+        # in ~/.gemini/oauth_creds.json. Since we set HOME="." in run(),
+        # we need to copy these credentials to the workdir.
+        oauth_creds_path = Path(os.path.expanduser("~/.gemini/oauth_creds.json"))
+        if oauth_creds_path.exists():
+            try:
+                with open(oauth_creds_path, "r") as f:
+                    oauth_creds = json.load(f)
+                config_objects.append(
+                    CoderConfigObject(
+                        file_type=FileType.JSON,
+                        relative_path=".gemini/oauth_creds.json",
+                        content=oauth_creds,
+                    )
+                )
+            except (IOError, json.JSONDecodeError) as e:
+                logger.warning(f"Failed to load OAuth credentials from {oauth_creds_path}: {e}")
 
         # Add GEMINI.md if present in config
         # This could contain instructions specific to the task
