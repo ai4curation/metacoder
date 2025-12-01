@@ -179,6 +179,7 @@ class BaseCoder(BaseModel, ABC):
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,  # Provide stdin to prevent hanging on processes that read it
             text=True,
             encoding="utf-8",
             errors="replace",  # avoid crashes on the occasional bad byte
@@ -186,6 +187,9 @@ class BaseCoder(BaseModel, ABC):
             bufsize=1,
             universal_newlines=True,
         )
+        # Close stdin immediately since we don't write to it
+        # This prevents subprocesses from hanging while waiting for input
+        process.stdin.close()
 
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
