@@ -261,5 +261,7 @@ class ClaudeCoder(BaseCoder):
                         f"For custom endpoints, also set ANTHROPIC_BASE_URL. Original error: {ao.stderr} // {ao}"
                     )
                 # Don't raise for other errors - let evaluation continue and mark test as failed
-                logger.warning(f"Claude returned error (test will be marked as failed): {ao.result_text}")
+                logger.warning(
+                    f"Claude returned error (test will be marked as failed): {ao.result_text}"
+                )
             return ao

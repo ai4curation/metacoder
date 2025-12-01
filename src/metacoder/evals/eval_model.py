@@ -18,13 +18,15 @@ class MetricConfig(BaseModel):
         default=None, description="Custom rubric for evaluation"
     )
     criteria: Optional[str] = Field(
-        default=None, description="Custom criteria for evaluation (mutually exclusive with evaluation_steps)"
+        default=None,
+        description="Custom criteria for evaluation (mutually exclusive with evaluation_steps)",
     )
     evaluation_steps: Optional[List[str]] = Field(
-        default=None, description="Custom evaluation steps (mutually exclusive with criteria)"
+        default=None,
+        description="Custom evaluation steps (mutually exclusive with criteria)",
     )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_mutual_exclusivity(self):
         """Ensure criteria and evaluation_steps are mutually exclusive and at least one is provided."""
         # Check mutual exclusivity
@@ -36,7 +38,11 @@ class MetricConfig(BaseModel):
             )
 
         # Check that at least one is provided
-        if self.criteria is None and self.evaluation_steps is None and self.rubric is None:
+        if (
+            self.criteria is None
+            and self.evaluation_steps is None
+            and self.rubric is None
+        ):
             raise ValueError(
                 "Must provide at least one of: criteria, evaluation_steps, or rubric"
             )

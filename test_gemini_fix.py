@@ -3,6 +3,7 @@
 Test script to verify the GeminiCoder fix works correctly.
 This tests that gemini CLI is invoked with positional arguments instead of stdin piping.
 """
+
 import tempfile
 import shutil
 from pathlib import Path
@@ -14,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from metacoder.coders.gemini import GeminiCoder
 from metacoder.configuration import RunConfig, MCPConfig, MCPType
+
 
 def test_gemini_simple_prompt():
     """Test that gemini can handle a simple prompt correctly."""
@@ -51,6 +53,7 @@ def test_gemini_simple_prompt():
 
         print("✅ TEST PASSED: Simple prompt works")
         return True
+
 
 def test_gemini_with_mcp():
     """Test that gemini works with MCP server configured."""
@@ -110,6 +113,7 @@ def test_gemini_with_mcp():
         print("✅ TEST PASSED: Gemini works with MCP configuration")
         return True
 
+
 def test_gemini_special_characters():
     """Test that gemini handles prompts with special characters correctly."""
     print("\n" + "=" * 60)
@@ -141,10 +145,13 @@ def test_gemini_special_characters():
         print("✅ TEST PASSED: Special characters handled correctly")
         return True
 
+
 def main():
     # Check if gemini is available
     if not shutil.which("gemini"):
-        print("⚠️  WARNING: gemini CLI not found. Install with: npm install -g @google/gemini-cli")
+        print(
+            "⚠️  WARNING: gemini CLI not found. Install with: npm install -g @google/gemini-cli"
+        )
         sys.exit(1)
 
     print("Testing GeminiCoder fix...\n")
@@ -162,6 +169,7 @@ def main():
         except Exception as e:
             print(f"❌ TEST FAILED with exception: {e}")
             import traceback
+
             traceback.print_exc()
             results.append(False)
 
@@ -178,6 +186,7 @@ def main():
     else:
         print("\n❌ SOME TESTS FAILED - Fix needs more work")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

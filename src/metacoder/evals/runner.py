@@ -354,7 +354,11 @@ class EvalRunner:
                 metric_config = metric_item
 
             # Create the metric instance
-            if metric_config and (metric_config.rubric or metric_config.criteria or metric_config.evaluation_steps):
+            if metric_config and (
+                metric_config.rubric
+                or metric_config.criteria
+                or metric_config.evaluation_steps
+            ):
                 # Use custom configuration if provided
                 logger.info(f"Using custom configuration for {metric_name}")
                 metric = make_custom_geval(metric_config, model=None)
