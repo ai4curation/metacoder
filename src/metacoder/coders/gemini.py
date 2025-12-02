@@ -135,7 +135,13 @@ class GeminiCoder(BaseCoder):
             # Build the command
             # The gemini CLI accepts the prompt as a positional argument
             # We pass it directly as an argument to avoid shell escaping issues
-            command = ["gemini", text]
+            command = ["gemini"]
+
+            # Add model parameter if specified
+            if self.params and self.params.get("model"):
+                command.extend(["-m", self.params["model"]])
+
+            command.append(text)
 
             logger.info("💎 Running command: gemini with prompt")
             logger.debug(f"💎 Full command: {' '.join(command)}")
