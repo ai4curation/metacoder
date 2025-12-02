@@ -133,15 +133,16 @@ class GeminiCoder(BaseCoder):
             text = self.expand_prompt(input_text)
 
             # Build the command
-            # The gemini CLI accepts the prompt as a positional argument
-            # We pass it directly as an argument to avoid shell escaping issues
+            # Use -p flag instead of positional argument to work around bug with MCP servers
+            # See: https://github.com/google-gemini/gemini-cli/issues/XXX
             command = ["gemini"]
 
             # Add model parameter if specified
             if self.params and self.params.get("model"):
                 command.extend(["-m", self.params["model"]])
 
-            command.append(text)
+            # Use -p flag for prompt (works with MCP servers, positional doesn't)
+            command.extend(["-p", text])
 
             logger.info("💎 Running command: gemini with prompt")
             logger.debug(f"💎 Full command: {' '.join(command)}")
