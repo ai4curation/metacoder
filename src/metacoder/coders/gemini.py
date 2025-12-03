@@ -143,7 +143,8 @@ class GeminiCoder(BaseCoder):
 
             # Add workspace directory so MCP tools can access files
             # Without this, gemini will error with "File path must be within workspace directories"
-            command.extend(["--include-directories", str(Path(self.workdir).resolve())])
+            # Use Path.cwd() since we're already inside the workdir from change_directory()
+            command.extend(["--include-directories", str(Path.cwd())])
 
             # Use -p flag for prompt (works with MCP servers, positional doesn't)
             command.extend(["-p", text])
