@@ -141,6 +141,10 @@ class GeminiCoder(BaseCoder):
             if self.params and self.params.get("model"):
                 command.extend(["-m", self.params["model"]])
 
+            # Add workspace directory so MCP tools can access files
+            # Without this, gemini will error with "File path must be within workspace directories"
+            command.extend(["--include-directories", str(self.workdir)])
+
             # Use -p flag for prompt (works with MCP servers, positional doesn't)
             command.extend(["-p", text])
 
