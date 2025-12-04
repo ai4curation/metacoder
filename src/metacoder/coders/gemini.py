@@ -149,6 +149,9 @@ class GeminiCoder(BaseCoder):
             # Use -p flag for prompt (works with MCP servers, positional doesn't)
             command.extend(["-p", text])
 
+            # Use text output format to prevent interactive mode (non-interactive/headless mode)
+            command.extend(["--output-format", "text"])
+
             logger.info("💎 Running command: gemini with prompt")
             logger.debug(f"💎 Full command: {' '.join(command)}")
             start_time = time.time()
