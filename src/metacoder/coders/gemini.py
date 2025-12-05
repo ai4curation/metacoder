@@ -130,15 +130,27 @@ class GeminiCoder(BaseCoder):
         self.prepare_workdir()
 
         with change_directory(self.workdir):
-            # Gemini expects HOME to be current directory for config
-            env["HOME"] = "."
-
             text = self.expand_prompt(input_text)
 
             # Build the command
-            # The gemini CLI uses conversational interface, so we need to handle it differently
-            # For now, we'll use echo to pipe the prompt
-            command = ["sh", "-c", f'echo "{text}" | gemini']
+            # Use -p flag instead of positional argument to work around bug with MCP servers
+            # See: https://github.com/google-gemini/gemini-cli/issues/XXX
+            command = ["gemini"]
+
+            # Add model parameter if specified
+            if self.params and self.params.get("model"):
+                command.extend(["-m", self.params["model"]])
+
+            # Add workspace directory so MCP tools can access files
+            # Without this, gemini will error with "File path must be within workspace directories"
+            # Use Path.cwd() since we're already inside the workdir from change_directory()
+            command.extend(["--include-directories", str(Path.cwd())])
+
+            # Use -p flag for prompt (works with MCP servers, positional doesn't)
+            command.extend(["-p", text])
+
+            # Use text output format to prevent interactive mode (non-interactive/headless mode)
+            command.extend(["--output-format", "text"])
 
             logger.info("💎 Running command: gemini with prompt")
             logger.debug(f"💎 Full command: {' '.join(command)}")
@@ -156,7 +168,7 @@ class GeminiCoder(BaseCoder):
                 )
 
             end_time = time.time()
-            logger.info(f"💎 Command took {end_time - start_time} seconds")
+            logger.info(f"💎 Command took {end_time - start_time:.2f} seconds")
 
             # Parse the output
             ao = CoderOutput(stdout=result.stdout, stderr=result.stderr)

@@ -1,0 +1,34 @@
+GOOSE_MODEL: claude-sonnet-4-20250514
+GOOSE_PROVIDER: anthropic
+extensions:
+  developer:
+    bundled: true
+    display_name: Developer
+    enabled: true
+    name: developer
+    timeout: 300
+    type: builtin
+  ols:
+    args:
+    - mcp-ols
+    bundled: null
+    cmd: uvx
+    enabled: true
+    env_keys: []
+    envs: {}
+    name: ols
+    timeout: 300
+    type: stdio
+  pubmed:
+    args:
+    - mcp-simple-pubmed
+    bundled: null
+    cmd: uvx
+    enabled: true
+    env_keys:
+    - PUBMED_EMAIL
+    envs:
+      PUBMED_EMAIL: cjmungall@lbl.gov
+    name: pubmed
+    timeout: 300
+    type: stdio

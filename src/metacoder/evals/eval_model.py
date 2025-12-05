@@ -1,6 +1,53 @@
-from typing import Any, Optional, List, Dict
-from pydantic import BaseModel, Field
+from typing import Any, Optional, List, Dict, Union
+from pydantic import BaseModel, Field, model_validator
 from metacoder.configuration import AIModelConfig, MCPConfig
+
+
+class RubricItem(BaseModel):
+    """A single rubric scoring guideline."""
+
+    score: float = Field(..., description="Score value (typically 0.0 or 1.0)")
+    criteria: str = Field(..., description="Criteria for this score")
+
+
+class MetricConfig(BaseModel):
+    """Configuration for a metric with optional custom rubric."""
+
+    name: str = Field(..., description="Metric name (e.g., CorrectnessMetric)")
+    rubric: Optional[List[RubricItem]] = Field(
+        default=None, description="Custom rubric for evaluation"
+    )
+    criteria: Optional[str] = Field(
+        default=None,
+        description="Custom criteria for evaluation (mutually exclusive with evaluation_steps)",
+    )
+    evaluation_steps: Optional[List[str]] = Field(
+        default=None,
+        description="Custom evaluation steps (mutually exclusive with criteria)",
+    )
+
+    @model_validator(mode="after")
+    def validate_mutual_exclusivity(self):
+        """Ensure criteria and evaluation_steps are mutually exclusive and at least one is provided."""
+        # Check mutual exclusivity
+        if self.criteria is not None and self.evaluation_steps is not None:
+            raise ValueError(
+                "Cannot specify both 'criteria' and 'evaluation_steps'. "
+                "Use one or the other. evaluation_steps provides more control, "
+                "while criteria auto-generates steps."
+            )
+
+        # Check that at least one is provided
+        if (
+            self.criteria is None
+            and self.evaluation_steps is None
+            and self.rubric is None
+        ):
+            raise ValueError(
+                "Must provide at least one of: criteria, evaluation_steps, or rubric"
+            )
+
+        return self
 
 
 class EvalCase(BaseModel):
@@ -18,12 +65,43 @@ class EvalCase(BaseModel):
         expected_output: "Example Paper Title"
         threshold: 0.9
         ```
+
+    Example with custom rubric:
+        ```yaml
+        name: "retraction_check"
+        metrics:
+          - name: CorrectnessMetric
+            rubric:
+              - score: 0.0
+                criteria: "Output indicates paper not retracted"
+              - score: 1.0
+                criteria: "Output indicates paper is retracted"
+        input: "Is PMC4831113 retracted?"
+        expected_output: "Yes"
+        ```
+
+    Example with custom evaluation_steps:
+        ```yaml
+        name: "exact_text_extraction"
+        metrics:
+          - name: CorrectnessMetric
+            evaluation_steps:
+              - "Check whether the actual output contains the exact text from expected output"
+              - "Heavily penalize any deviation, paraphrasing, or added explanations"
+              - "The text must be verbatim, not approximate"
+        input: "What is the first sentence of section 2?"
+        expected_output: "This is the exact sentence."
+        threshold: 0.9
+        ```
     """
 
     name: str = Field(..., description="Unique identifier for the test case")
-    metrics: List[str] = Field(
+    group: Optional[str] = Field(
+        default="Default", description="Test category for result grouping."
+    )
+    metrics: List[Union[str, MetricConfig]] = Field(
         ...,
-        description="List of metric names to apply (e.g., CorrectnessMetric, FaithfulnessMetric)",
+        description="List of metric names or metric configurations with custom rubrics",
     )
     input: str = Field(
         ..., description="The prompt or question to send to the AI coder"

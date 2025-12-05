@@ -246,7 +246,7 @@ class ClaudeCoder(BaseCoder):
                 ao.tool_uses = tool_uses
 
             end_time = time.time()
-            logger.info(f"🤖 Command took {end_time - start_time} seconds")
+            logger.info(f"🤖 Command took {end_time - start_time:.2f} seconds")
             ao.total_cost_usd = total_cost_usd
             ao.success = not is_error
             if not ao.success:
@@ -260,5 +260,8 @@ class ClaudeCoder(BaseCoder):
                         f"Claude authentication failed. Try setting ANTHROPIC_AUTH_TOKEN environment variable or run 'claude setup-token'. "
                         f"For custom endpoints, also set ANTHROPIC_BASE_URL. Original error: {ao.stderr} // {ao}"
                     )
-                raise ValueError(f"Claude failed with error: {ao.stderr} // {ao}")
+                # Don't raise for other errors - let evaluation continue and mark test as failed
+                logger.warning(
+                    f"Claude returned error (test will be marked as failed): {ao.result_text}"
+                )
             return ao

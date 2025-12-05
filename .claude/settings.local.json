@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(uv sync:*)",
+      "Bash(make test:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run:*)",
+      "Bash(make:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -5,26 +5,31 @@ Runs evaluations across all combinations of model x coder x case x metric.
 """
 
 import copy
+import functools
 import importlib
 import logging
+import os
 import time
+import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, cast
 
 from pydantic import BaseModel
 import yaml
-from deepeval import evaluate
-from deepeval.metrics import BaseMetric
-from deepeval.test_case import LLMTestCase
-from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCaseParams
 
+from deepeval import evaluate
+from deepeval.evaluate import AsyncConfig, DisplayConfig, CacheConfig, ErrorConfig
+from deepeval.models import DeepEvalBaseLLM
+from deepeval.metrics import BaseMetric, GEval
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+
+from openai import APIStatusError
+from openai.types.chat import ChatCompletionMessageParam
 
 from metacoder.coders.base_coder import BaseCoder, CoderOutput
 from metacoder.registry import AVAILABLE_CODERS
-from metacoder.evals.eval_model import EvalCase, EvalDataset
+from metacoder.evals.eval_model import EvalCase, EvalDataset, MetricConfig
 from metacoder.configuration import AIModelConfig, CoderConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,24 +64,94 @@ class DummyMetric(BaseMetric):
         return self.success
 
 
-def get_default_metrics() -> Dict[str, BaseMetric]:
-    """Get default metrics. Creates instances lazily to avoid network calls during import."""
+def make_geval(model: Optional[DeepEvalBaseLLM] = None) -> GEval:
+    """Creates a GEval instance with the specified model.
+
+    Uses evaluation_steps (not criteria) for more reliable scoring across runs.
+    """
+    return GEval(
+        name="Correctness",
+        # NOTE: you can only provide either criteria or evaluation_steps, and not both
+        # Using evaluation_steps for more control and reliability
+        evaluation_steps=[
+            "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
+            "You should also heavily penalize omission of detail",
+            "Vague language, or contradicting OPINIONS, are OK",
+        ],
+        threshold=0.8,
+        evaluation_params=[
+            LLMTestCaseParams.INPUT,
+            LLMTestCaseParams.ACTUAL_OUTPUT,
+            LLMTestCaseParams.EXPECTED_OUTPUT,
+        ],
+        model=model,  # may be None (defaults to OpenAI) or a Claude judge
+    )
+
+
+def make_custom_geval(
+    metric_config: MetricConfig, model: Optional[DeepEvalBaseLLM] = None
+) -> GEval:
+    """Creates a GEval instance with custom criteria/rubric/evaluation_steps from MetricConfig.
+
+    Args:
+        metric_config: Configuration with custom evaluation parameters
+        model: Optional LLM model (defaults to OpenAI GPT-4)
+
+    Returns:
+        Configured GEval instance
+
+    Note:
+        criteria and evaluation_steps are mutually exclusive (enforced by MetricConfig validator).
+        evaluation_steps provides more control and reliability, while criteria auto-generates steps.
+    """
+    from deepeval.metrics.g_eval.utils import Rubric
+
+    # Convert rubric if provided
+    rubrics = []
+    if metric_config.rubric:
+        for item in metric_config.rubric:
+            rubrics.append(
+                Rubric(
+                    score_range=(item.score, item.score),
+                    expected_outcome=item.criteria,
+                )
+            )
+
+    # Build kwargs for GEval
+    kwargs = {
+        "name": metric_config.name,
+        "evaluation_params": [
+            LLMTestCaseParams.INPUT,
+            LLMTestCaseParams.ACTUAL_OUTPUT,
+            LLMTestCaseParams.EXPECTED_OUTPUT,
+        ],
+        "model": model,
+    }
+
+    # Add evaluation_steps OR criteria (mutually exclusive)
+    # Note: Pydantic validator already ensures mutual exclusivity
+    if metric_config.evaluation_steps:
+        kwargs["evaluation_steps"] = metric_config.evaluation_steps
+    elif metric_config.criteria:
+        kwargs["criteria"] = metric_config.criteria
+    else:
+        # Default criteria if only rubric provided
+        kwargs["criteria"] = "Evaluate the actual output based on the rubric criteria."
+
+    # Add rubric if provided
+    if rubrics:
+        kwargs["rubric"] = rubrics
+
+    return GEval(**kwargs)
+
+
+def get_default_metrics(
+    model: Optional[DeepEvalBaseLLM] = None,
+) -> Dict[str, BaseMetric]:
+    """Get default metrics with the specified model. Creates instances lazily to avoid network calls during import."""
     return {
-        "CorrectnessMetric": GEval(
-            name="Correctness",
-            criteria="Determine whether the actual output is factually correct based on the expected output.",
-            # NOTE: you can only provide either criteria or evaluation_steps, and not both
-            evaluation_steps=[
-                "Check whether the facts in 'actual output' contradicts any facts in 'expected output'",
-                "You should also heavily penalize omission of detail",
-                "Vague language, or contradicting OPINIONS, are OK",
-            ],
-            threshold=0.8,
-            evaluation_params=[
-                LLMTestCaseParams.INPUT,
-                LLMTestCaseParams.ACTUAL_OUTPUT,
-                LLMTestCaseParams.EXPECTED_OUTPUT,
-            ],
+        "CorrectnessMetric": make_geval(
+            model=model  # Note: GEval defaults to OpenAI if no model is specified.
         ),
         "DummyMetric": DummyMetric(threshold=0.5),
     }
@@ -106,6 +181,7 @@ class EvalResult(BaseModel):
     model: str
     coder: str
     case_name: str
+    case_group: str
     metric_name: str
     score: float
     passed: bool
@@ -123,6 +199,8 @@ class EvalRunner:
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
+        self.use_openai = True  # GEval will default to OpenAI, avoid it and downgrade to another provider or metric if quota runs out.
+
         if verbose:
             logging.basicConfig(level=logging.DEBUG)
         else:
@@ -183,6 +261,48 @@ class EvalRunner:
             additional_metadata=case.additional_metadata,
         )
 
+    @functools.lru_cache(maxsize=1)
+    def _openai_quota_ok(self, model: str = "gpt-4o-mini") -> bool:
+        if not os.getenv("OPENAI_API_KEY"):
+            logger.info("OPENAI_API_KEY is not set.")
+            return False
+        """
+            Preflight: detect “no OpenAI quota” and skip/redirect before calling evaluate.
+            Fast probe of the /chat/completions endpoint (the one GEval uses).
+            Returns False on 429 (insufficient_quota) or any exception.
+        """
+        try:
+            from openai import OpenAI
+
+            # turn off SDK retries for the check so it returns fast
+            client = OpenAI(max_retries=0, timeout=8)  # NO retries, quick fail
+            # messages = cast(List[ChatCompletionMessageParam], [{"role": "user", "content": "ping"}])
+            raw = [{"role": "user", "content": "ping"}]
+            messages = cast(List[ChatCompletionMessageParam], raw)
+            client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=1,
+                temperature=0,
+            )
+            return True
+        except APIStatusError as e:
+            # 429 insufficient quota or too many requests
+            if e.status_code == 429:
+                logger.warning(f"OpenAI API Key has insufficient quota: {e}")
+                return False
+            # 401 authentication problem, including invalid API key
+            if e.status_code == 401:
+                logger.warning(f"OpenAI API Authentication Error: {e}")
+                return False
+            # all other errors
+            logger.warning(f"OpenAI API Status Error; treating as no-quota: {e}")
+            return False
+        except Exception as e:
+            # includes network issues, etc.
+            logger.warning(f"OpenAI preflight failed; treating as no-quota: {e}")
+            return False
+
     def run_single_eval(
         self,
         model_name: str,
@@ -198,7 +318,7 @@ class EvalRunner:
         # Create coder instance
         coder = create_coder(
             coder_name,
-            workdir=str(workdir / f"{model_name}_{coder_name}_{case.name}"),
+            workdir=str(workdir),
             config=coder_config,
         )
 
@@ -222,21 +342,99 @@ class EvalRunner:
         execution_time = time.time() - start_time
 
         # Run each metric
-        for metric_name in case.metrics:
-            default_metrics = get_default_metrics()
-            if metric_name in default_metrics:
-                metric = default_metrics[metric_name]
+        for metric_item in case.metrics:
+            # Handle both string metrics and MetricConfig objects
+            if isinstance(metric_item, str):
+                # Original behavior: string metric name
+                metric_name = metric_item
+                metric_config = None
             else:
-                # Get metric class and instantiate
-                metric_class = self.get_metric_class(metric_name)
-                metric = metric_class(threshold=case.threshold)  # type: ignore
+                # New behavior: MetricConfig object with potential custom rubric
+                metric_name = metric_item.name
+                metric_config = metric_item
+
+            # Create the metric instance
+            if metric_config and (
+                metric_config.rubric
+                or metric_config.criteria
+                or metric_config.evaluation_steps
+            ):
+                # Use custom configuration if provided
+                logger.info(f"Using custom configuration for {metric_name}")
+                metric = make_custom_geval(metric_config, model=None)
+            else:
+                # Use default metric behavior
+                default_metrics = get_default_metrics()
+                if metric_name in default_metrics:
+                    metric = default_metrics[metric_name]
+                else:
+                    # Get metric class and instantiate
+                    metric_class = self.get_metric_class(metric_name)
+                    metric = metric_class(threshold=case.threshold)  # type: ignore
 
             # Create test case
             test_case = self.create_test_case(case, actual_output)
 
             # Evaluate
-            logger.info(f"Evaluating with {metric_name}")
-            eval_results = evaluate([test_case], [metric])
+            logger.info(
+                f"Evaluating {metric_name} using model {metric.model.model_name}"
+            )
+
+            if isinstance(metric, GEval):
+                # Assume GEval will use OpenAI until is disabled.
+                if self.use_openai and not self._openai_quota_ok():
+                    logger.warning(
+                        "OpenAI API quota exhausted or server unavailable; disabling OpenAI for DeepEval."
+                    )
+                    self.use_openai = False
+
+                # Note: This will downgrade a metric if needed each time it is about to be used without modifying the default metrics.
+                if not self.use_openai:
+                    claude_model = "claude-sonnet-4-20250514"
+                    logger.warning(
+                        f"Downgrading {metric_name} model from {metric.model.model_name} to {claude_model}."
+                    )
+
+                    try:
+                        # Downgrade metric model to Claude judge.
+                        from metacoder.evals.judges import ClaudeJudge
+
+                        judge = ClaudeJudge(claude_model)
+
+                        if not judge.has_available_quota():
+                            raise Exception(
+                                "No Anthropic credits available for ClaudeJudge."
+                            )
+
+                        metric = make_geval(model=judge)
+                        logger.info(
+                            f"Successfully downgraded {metric_name} model to {metric.model.model_name}."
+                        )
+                    except Exception as e:
+                        # Fallback: if you can't use Claude, downgrade gracefully.
+                        logging.debug(traceback.format_exc())
+                        logger.debug(e)
+                        logger.warning(
+                            f"Claude unavailable ({e}); downgrading {metric_name} to DummyMetric."
+                        )
+                        metric = DummyMetric(threshold=0.5)
+                        logger.warning(f"Downgraded {metric_name} to {metric.name}.")
+
+            eval_results = evaluate(
+                [test_case],
+                [metric],
+                async_config=AsyncConfig(run_async=False),  # disable async
+                display_config=DisplayConfig(
+                    show_indicator=False,  # hide the progress meter
+                    print_results=False,
+                    verbose_mode=self.verbose,
+                ),
+                cache_config=CacheConfig(use_cache=False, write_cache=False),
+                error_config=ErrorConfig(
+                    ignore_errors=False,  # actually fail on failure
+                    skip_on_missing_params=True,
+                ),
+            )
 
             # Extract results - the structure varies by deepeval version
             test_result = eval_results.test_results[0]
@@ -270,6 +468,7 @@ class EvalRunner:
                 model=model_name,
                 coder=coder_name,
                 case_name=case.name,
+                case_group=case.group,
                 metric_name=metric_name,
                 score=score if score is not None else 0.0,
                 passed=passed,
@@ -366,7 +565,7 @@ class EvalRunner:
                             else " (no servers)"
                         )
                         logger.info(
-                            f"Progress: {current}/{total_combinations} - {coder_name}/{model_name}/{case.name}{server_desc}"
+                            f"Progress: {current}/{total_combinations} ({coder_name} | {model_name} | {case.name}{server_desc})"
                         )
 
                         # Create unique workdir for this combination
@@ -408,7 +607,7 @@ class EvalRunner:
             results_data.append(result.model_dump())
 
         # Save as YAML
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             yaml.dump(
                 {"results": results_data, "summary": self.generate_summary(results)},
                 f,
