@@ -124,7 +124,7 @@ class GeminiCoder(BaseCoder):
 
     def run(self, input_text: str) -> CoderOutput:
         """
-        Run gemini with the given input text as a positional argument.
+        Run gemini with the given input text.
         """
         env = self.expand_env(self.env)
         self.prepare_workdir()
@@ -132,7 +132,9 @@ class GeminiCoder(BaseCoder):
         with change_directory(self.workdir):
             text = self.expand_prompt(input_text)
 
-            # Build the command - use positional argument for prompt
+            # Build the command
+            # Use -p flag instead of positional argument to work around bug with MCP servers
+            # See: https://github.com/google-gemini/gemini-cli/issues/XXX
             command = ["gemini"]
 
             # Add model parameter if specified
@@ -140,12 +142,17 @@ class GeminiCoder(BaseCoder):
                 command.extend(["-m", self.params["model"]])
 
             # Add workspace directory so MCP tools can access files
+            # Without this, gemini will error with "File path must be within workspace directories"
+            # Use Path.cwd() since we're already inside the workdir from change_directory()
             command.extend(["--include-directories", str(Path.cwd())])
 
-            # Add prompt as positional argument (simpler and works in non-interactive mode)
-            command.append(text)
+            # Use -p flag for prompt (works with MCP servers, positional doesn't)
+            command.extend(["-p", text])
 
-            logger.info("💎 Running command: gemini with positional argument")
+            # Use text output format to prevent interactive mode (non-interactive/headless mode)
+            command.extend(["--output-format", "text"])
+
+            logger.info("💎 Running command: gemini with prompt")
             logger.debug(f"💎 Full command: {' '.join(command)}")
             start_time = time.time()
 
