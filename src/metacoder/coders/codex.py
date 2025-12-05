@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 import logging
 import shutil
+from typing import Any
 
 from metacoder.coders.base_coder import (
     BaseCoder,
@@ -11,6 +12,7 @@ from metacoder.coders.base_coder import (
     FileType,
     change_directory,
 )
+from metacoder.configuration import ConfigFileRole, MCPConfig, MCPType
 
 
 logger = logging.getLogger(__name__)
@@ -18,8 +20,29 @@ logger = logging.getLogger(__name__)
 
 class CodexCoder(BaseCoder):
     """
-    For AWS bedrock, you may need to copy ~/.aws/
+    OpenAI Codex CLI integration.
 
+    Codex-specific configuration:
+
+    You can provide the following files in your configuration directory:
+
+    - `AGENTS.md` - Primary instructions for the assistant
+    - `.codex/config.toml` - Configuration including MCP servers
+
+    MCP Support:
+
+    Codex CLI supports MCP (Model Context Protocol) servers through the
+    mcp_servers configuration in .codex/config.toml. When MCPs are configured
+    through Metacoder, they will be automatically added to the config file.
+
+    The Codex CLI expects MCP servers to be configured in TOML format:
+
+        [mcp_servers.server_name]
+        command = "uvx"
+        args = ["mcp-server-name"]
+        env = { "API_KEY" = "value" }
+
+    Note: Requires codex CLI to be installed.
     """
 
     @classmethod
@@ -27,65 +50,86 @@ class CodexCoder(BaseCoder):
         """Check if codex command is available."""
         return shutil.which("codex") is not None
 
+    @classmethod
+    def supports_mcp(cls) -> bool:
+        """CodexCoder supports MCP extensions."""
+        return True
+
+    @classmethod
+    def default_config_paths(cls) -> dict[Path, ConfigFileRole]:
+        return {
+            Path("AGENTS.md"): ConfigFileRole.PRIMARY_INSTRUCTION,
+            Path(".codex/config.toml"): ConfigFileRole.CONFIG,
+        }
+
     @property
     def instructions_path(self) -> Path:
         return Path("AGENTS.md")
 
-    def default_config_objects(self) -> list[CoderConfigObject]:
-        """
-        extensions:
-            developer:
-                bundled: true
-                display_name: Developer
-                enabled: true
-                name: developer
-                timeout: 300
-                type: builtin
-            pdfreader:
-                args:
-                - mcp-read-pdf
-                bundled: null
-                cmd: uvx
-                description: Read large and complex PDF documents
-                enabled: true
-                env_keys: []
-                envs: {}
-                name: pdfreader
-                timeout: 300
-                type: stdio
-        """
-        return [
-            CoderConfigObject(
-                file_type=FileType.YAML,
-                relative_path=".config/goose/config.yaml",
-                content={
-                    "GOOSE_MODEL": "gpt-4o",
-                    "GOOSE_PROVIDER": "openai",
-                    "extensions": {
-                        "developer": {
-                            "bundled": True,
-                            "display_name": "Developer",
-                            "enabled": True,
-                            "name": "developer",
-                            "timeout": 300,
-                            "type": "builtin",
-                        },
-                        "pdfreader": {
-                            "args": ["mcp-read-pdf"],
-                            "bundled": None,
-                            "cmd": "uvx",
-                            "description": "Read large and complex PDF documents",
-                            "enabled": True,
-                            "env_keys": [],
-                            "envs": {},
-                            "name": "pdfreader",
-                            "timeout": 300,
-                            "type": "stdio",
-                        },
-                    },
-                },
+    def mcp_config_to_codex_format(self, mcp: MCPConfig) -> dict[str, Any]:
+        """Convert MCPConfig to Codex's MCP server format."""
+        server_config: dict[str, Any] = {}
+
+        # For stdio type MCPs
+        if mcp.type == MCPType.STDIO and mcp.command:
+            server_config["command"] = mcp.command
+            if mcp.args:
+                server_config["args"] = mcp.args
+            if mcp.env:
+                server_config["env"] = mcp.env
+
+        # For HTTP type MCPs
+        elif mcp.type == MCPType.HTTP:
+            raise NotImplementedError(
+                "HTTP MCPs are not supported for Codex wrapper yet"
             )
-        ]
+
+        return server_config
+
+    def _generate_toml_config(self, mcp_servers: dict[str, dict[str, Any]]) -> str:
+        """Generate TOML configuration string for Codex config.toml."""
+        lines = []
+
+        for server_name, server_config in mcp_servers.items():
+            lines.append(f"[mcp_servers.{server_name}]")
+            for key, value in server_config.items():
+                if key == "command":
+                    lines.append(f'command = "{value}"')
+                elif key == "args":
+                    args_str = ", ".join(f'"{arg}"' for arg in value)
+                    lines.append(f"args = [{args_str}]")
+                elif key == "env":
+                    env_parts = []
+                    for env_key, env_val in value.items():
+                        env_parts.append(f'"{env_key}" = "{env_val}"')
+                    env_str = ", ".join(env_parts)
+                    lines.append(f"env = {{ {env_str} }}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    def default_config_objects(self) -> list[CoderConfigObject]:
+        """Generate config objects including MCP configuration."""
+        config_objects = []
+
+        # Create .codex/config.toml if we have MCP extensions
+        if self.config and self.config.extensions:
+            mcp_servers = {}
+            for mcp in self.config.extensions:
+                if mcp.enabled:
+                    mcp_servers[mcp.name] = self.mcp_config_to_codex_format(mcp)
+
+            if mcp_servers:
+                toml_content = self._generate_toml_config(mcp_servers)
+                config_objects.append(
+                    CoderConfigObject(
+                        file_type=FileType.TEXT,
+                        relative_path=".codex/config.toml",
+                        content=toml_content,
+                    )
+                )
+
+        return config_objects
 
     def run(self, input_text: str) -> CoderOutput:
         """
