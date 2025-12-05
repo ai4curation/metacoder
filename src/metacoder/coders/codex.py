@@ -139,8 +139,8 @@ class CodexCoder(BaseCoder):
         self.prepare_workdir()
 
         with change_directory(self.workdir):
-            # important - ensure that only local config files are used
-            env["HOME"] = "."
+            # Codex reads .codex/config.toml from current directory automatically.
+            # Do NOT set HOME=. as this breaks authentication (401 Unauthorized).
             text = self.expand_prompt(input_text)
             command = ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", text]
 
