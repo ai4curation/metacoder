@@ -88,16 +88,16 @@ class CodexCoder(BaseCoder):
 
     def run(self, input_text: str) -> CoderOutput:
         """
-        Run claude code with the given input text.
+        Run codex with the given input text.
         """
         env = self.expand_env(self.env)
         # important - ensure that only local config files are used
-        # we assue chdir has been called beforehand
+        # we assume chdir has been called beforehand
         env["HOME"] = "."
         text = self.expand_prompt(input_text)
-        command = ["claude", "-p", "--verbose", "--output-format", "stream-json", text]
+        command = ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", text]
 
-        print(f"🤖 Running command: {' '.join(command)}")
+        print(f"📝 Running command: {' '.join(command)}")
         # time the command
         start_time = time.time()
         ao = self.run_process(command, env)
@@ -115,9 +115,9 @@ class CodexCoder(BaseCoder):
             if "result" in message:
                 ao.result_text = message["result"]
         end_time = time.time()
-        print(f"🤖 Command took {end_time - start_time:.2f} seconds")
+        print(f"📝 Command took {end_time - start_time:.2f} seconds")
         ao.total_cost_usd = total_cost_usd
         ao.success = not is_error
         if not ao.success:
-            raise ValueError(f"Claude failed with error: {ao.stderr} // {ao}")
+            raise ValueError(f"Codex failed with error: {ao.stderr} // {ao}")
         return ao
