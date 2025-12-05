@@ -9,6 +9,7 @@ from metacoder.coders.base_coder import (
     CoderConfigObject,
     CoderOutput,
     FileType,
+    change_directory,
 )
 
 
@@ -91,16 +92,18 @@ class CodexCoder(BaseCoder):
         Run codex with the given input text.
         """
         env = self.expand_env(self.env)
-        # important - ensure that only local config files are used
-        # we assume chdir has been called beforehand
-        env["HOME"] = "."
-        text = self.expand_prompt(input_text)
-        command = ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", text]
+        self.prepare_workdir()
 
-        print(f"📝 Running command: {' '.join(command)}")
-        # time the command
-        start_time = time.time()
-        ao = self.run_process(command, env)
+        with change_directory(self.workdir):
+            # important - ensure that only local config files are used
+            env["HOME"] = "."
+            text = self.expand_prompt(input_text)
+            command = ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", text]
+
+            print(f"📝 Running command: {' '.join(command)}")
+            # time the command
+            start_time = time.time()
+            ao = self.run_process(command, env)
         # parse the jsonl output
         ao.structured_messages = [
             json.loads(line) for line in ao.stdout.split("\n") if line
