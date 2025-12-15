@@ -157,8 +157,20 @@ def get_default_metrics(
     }
 
 
-def create_coder(coder_name: str, workdir: str, config=None) -> BaseCoder:
-    """Create a coder instance."""
+def create_coder(
+    coder_name: str,
+    workdir: str,
+    config=None,
+    coder_options: Optional[Dict[str, Any]] = None,
+) -> BaseCoder:
+    """Create a coder instance.
+
+    Args:
+        coder_name: Name of the coder (e.g., 'codex', 'claude', 'goose')
+        workdir: Working directory for the coder
+        config: CoderConfig with model and extensions
+        coder_options: Coder-specific options from YAML config (e.g., disable_shell_tool)
+    """
     if coder_name not in AVAILABLE_CODERS:
         available = ", ".join(AVAILABLE_CODERS.keys())
         raise ValueError(f"Unknown coder: {coder_name}. Available: {available}")
@@ -171,6 +183,15 @@ def create_coder(coder_name: str, workdir: str, config=None) -> BaseCoder:
     # Apply config if provided
     if config:
         coder.config = config
+
+    # Apply coder-specific options (e.g., disable_shell_tool for Codex)
+    if coder_options:
+        for key, value in coder_options.items():
+            if hasattr(coder, key):
+                setattr(coder, key, value)
+                logger.info(f"Set coder option: {key}={value}")
+            else:
+                logger.warning(f"Unknown coder option for {coder_name}: {key}")
 
     return coder
 
@@ -311,6 +332,7 @@ class EvalRunner:
         case: EvalCase,
         workdir: Path,
         coder_config: CoderConfig | None = None,
+        coder_options: Optional[Dict[str, Any]] = None,
     ) -> List[EvalResult]:
         """Run evaluation for a single model x coder x case combination."""
         results = []
@@ -320,6 +342,7 @@ class EvalRunner:
             coder_name,
             workdir=str(workdir),
             config=coder_config,
+            coder_options=coder_options,
         )
 
         # Set environment variables for the model
@@ -589,6 +612,7 @@ class EvalRunner:
                             case,
                             combo_workdir,
                             coder_config,
+                            coder_options=coder_config_base,  # Pass coder-specific options
                         )
 
                         # Add server info to results
