@@ -42,8 +42,17 @@ class CodexCoder(BaseCoder):
         args = ["mcp-server-name"]
         env = { "API_KEY" = "value" }
 
+    Coder Options (passed via coders config in YAML):
+
+        coders:
+          codex:
+            disable_shell_tool: true  # Disable shell/bash access, MCP-only mode
+
     Note: Requires codex CLI to be installed.
     """
+
+    # Coder-specific options (set from YAML config)
+    disable_shell_tool: bool = False
 
     @classmethod
     def is_available(cls) -> bool:
@@ -142,7 +151,19 @@ class CodexCoder(BaseCoder):
             # Codex reads .codex/config.toml from current directory automatically.
             # Do NOT set HOME=. as this breaks authentication (401 Unauthorized).
             text = self.expand_prompt(input_text)
-            command = ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", text]
+
+            # Build command with appropriate flags
+            if self.disable_shell_tool:
+                # MCP-only mode: disable shell tool to prevent filesystem access
+                # This forces Codex to use only MCP tools for retrieving information
+                command = [
+                    "codex", "exec", "--json", "--full-auto",
+                    "--skip-git-repo-check", "--disable", "shell_tool", text
+                ]
+                logger.info("Running Codex in MCP-only mode (shell_tool disabled)")
+            else:
+                # Default mode: full access (for general use cases)
+                command = ["codex", "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", text]
 
             print(f"📝 Running command: {' '.join(command)}")
             # time the command
